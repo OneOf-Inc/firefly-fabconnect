@@ -30,14 +30,15 @@ import (
 
 // RESTGatewayConf defines the YAML config structure
 type RESTGatewayConf struct {
-	MaxInFlight     int             `mapstructure:"maxInFlight"`
-	MaxTXWaitTime   int             `mapstructure:"maxTXWaitTime"`
-	SendConcurrency int             `mapstructure:"sendConcurrency"`
-	Kafka           KafkaConf       `mapstructure:"kafka"`
-	Receipts        ReceiptsDBConf  `mapstructure:"receipts"`
-	Events          EventstreamConf `mapstructure:"events"`
-	HTTP            HTTPConf        `mapstructure:"http"`
-	RPC             RPCConf         `mapstructure:"rpc"`
+	MaxInFlight        int                `mapstructure:"maxInFlight"`
+	MaxTXWaitTime      int                `mapstructure:"maxTXWaitTime"`
+	SendConcurrency    int                `mapstructure:"sendConcurrency"`
+	Kafka              KafkaConf          `mapstructure:"kafka"`
+	Receipts           ReceiptsDBConf     `mapstructure:"receipts"`
+	Events             EventstreamConf    `mapstructure:"events"`
+	HTTP               HTTPConf           `mapstructure:"http"`
+	RPC                RPCConf            `mapstructure:"rpc"`
+	ExternalWalletConf ExternalWalletConf `mapstructure:"wallet"`
 }
 
 // KafkaConf - Common configuration for Kafka
@@ -111,6 +112,11 @@ type TLSConfig struct {
 	InsecureSkipVerify bool   `mapstructure:"insecureSkipVerify"`
 }
 
+// External Wallet Config
+type ExternalWalletConf struct {
+	Addr string `mapstructure:"addr"`
+}
+
 // CobraInitRPC sets the standard command-line parameters for RPC
 func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 	cmd.Flags().IntVarP(&conf.MaxInFlight, "maxinflight", "m", 0, "Maximum messages to hold in-flight")
@@ -179,4 +185,7 @@ func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 	_ = viper.BindPFlag("rpc.useGatewayClient", cmd.Flags().Lookup("gateway-client"))
 	cmd.Flags().BoolVarP(&conf.RPC.UseGatewayServer, "gateway-server", "", false, "Whether to use the server-side gateway support when sending transactions (Fabric 2.4 or later only)")
 	_ = viper.BindPFlag("rpc.useGatewayServer", cmd.Flags().Lookup("gateway-server"))
+
+	cmd.Flags().StringVarP(&conf.ExternalWalletConf.Addr, "remote-wallet-addr", "W", "", "Remote Wallet Address")
+	_ = viper.BindPFlag("wallet.addr", cmd.Flags().Lookup("remote-wallet-addr"))
 }

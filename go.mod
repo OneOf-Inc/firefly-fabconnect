@@ -51,4 +51,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace google.golang.org/grpc => google.golang.org/grpc v1.29.0
+replace (
+	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220617091732-e170b98fa821 => ./fabric-sdk-go
+	google.golang.org/grpc => google.golang.org/grpc v1.29.0
+)

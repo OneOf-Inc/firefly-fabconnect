@@ -27,14 +27,20 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/bccsp/sw"
 	fabImpl "github.com/hyperledger/fabric-sdk-go/pkg/fab"
+	"github.com/hyperledger/fabric-sdk-go/pkg/fab/keyvaluestore"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+
+	walletApi "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/api"
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
+	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
 )
 
 type identityManagerProvider struct {
@@ -51,9 +57,11 @@ type idClientWrapper struct {
 	identityMgr    msp.IdentityManager
 	caClient       dep.CAClient
 	listeners      []SignerUpdateListener
+
+	extWalletConfig ewConfig.WalletConfig
 }
 
-func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
+func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, wc conf.ExternalWalletConf) (*idClientWrapper, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 	cs, err := sw.GetSuiteByConfig(cryptoConfig)
@@ -102,6 +110,9 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 		caClient:       caClient,
 		listeners:      listeners,
 	}
+
+	idc.extWalletConfig = ewConfig.NewWalletConfig(wc.Addr, configBackend...)
+
 	return idc, nil
 }
 
@@ -144,15 +155,19 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 		}
 	}
 
-	secret, err := w.caClient.Register(rr)
+	// Modified to use remote register
+	rcs := walletApi.NewWalletApiHandler(w.extWalletConfig.Addr, w.extWalletConfig.MspId)
+	secret, err := rcs.Register(rr)
+
+	// secret, err := w.caClient.Register(rr)
 	if err != nil {
 		log.Errorf("Failed to register user %s. %s", regreq.Name, err)
 		return nil, restutil.NewRestError(err.Error())
 	}
 
 	result := identity.RegisterResponse{
-		Name:   rr.Name,
-		Secret: secret,
+		Name:   regreq.Name,
+		Secret: string(secret),
 	}
 	return &result, nil
 }
@@ -207,29 +222,51 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 		return nil, restutil.NewRestError(`missing required parameter "secret"`, 400)
 	}
 
-	input := mspApi.EnrollmentRequest{
-		Name:    username,
-		Secret:  enreq.Secret,
-		CAName:  enreq.CAName,
-		Profile: enreq.Profile,
-	}
-	if enreq.AttrReqs != nil {
-		input.AttrReqs = []*mspApi.AttributeRequest{}
-		for attr, optional := range enreq.AttrReqs {
-			input.AttrReqs = append(input.AttrReqs, &mspApi.AttributeRequest{Name: attr, Optional: optional})
-		}
-	}
+	// input := mspApi.EnrollmentRequest{
+	// 	Name:    username,
+	// 	Secret:  enreq.Secret,
+	// 	CAName:  enreq.CAName,
+	// 	Profile: enreq.Profile,
+	// }
+	// if enreq.AttrReqs != nil {
+	// 	input.AttrReqs = []*mspApi.AttributeRequest{}
+	// 	for attr, optional := range enreq.AttrReqs {
+	// 		input.AttrReqs = append(input.AttrReqs, &mspApi.AttributeRequest{Name: attr, Optional: optional})
+	// 	}
+	// }
 
-	err = w.caClient.Enroll(&input)
+	rcs := walletApi.NewWalletApiHandler(w.extWalletConfig.Addr, w.extWalletConfig.MspId)
+	enrollmentBytes, err := rcs.Enroll(username)
+	// err = w.caClient.Enroll(&input)
 	if err != nil {
 		log.Errorf("Failed to enroll user %s. %s", enreq.Name, err)
 		return nil, restutil.NewRestError(err.Error())
 	}
 
+	// store enrollment to user store
+	enrollment := &walletApi.RemoteEnrollResponse{}
+	if err = json.Unmarshal(enrollmentBytes, enrollment); err != nil {
+		return nil, restutil.NewRestError(err.Error())
+	}
+	store, err := keyvaluestore.New(&keyvaluestore.FileKeyValueStoreOptions{
+		Path: w.extWalletConfig.UserStorePath,
+	})
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error())
+	}
+	keyId := username + "@" + w.extWalletConfig.MspId + "-cert.pem"
+	err = store.Store(keyId, []byte(enrollment.Cetificate))
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error())
+	}
+	// end
+
 	result := identity.IdentityResponse{
 		Name:    enreq.Name,
 		Success: true,
 	}
+
+	
 
 	w.notifySignerUpdate(username)
 	return &result, nil
@@ -289,7 +326,9 @@ func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, par
 		GenCRL: enreq.GenCRL,
 	}
 
-	response, err := w.caClient.Revoke(&input)
+	rcs := walletApi.NewWalletApiHandler(w.extWalletConfig.Addr, w.extWalletConfig.MspId)
+	response, err := rcs.Revoke(input)
+	// response, err := w.caClient.Revoke(&input)
 	if err != nil {
 		log.Errorf("Failed to revoke certificate for user %s. %s", enreq.Name, err)
 		return nil, restutil.NewRestError(err.Error())
@@ -353,15 +392,22 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 		}
 	}
 
-	// the SDK identity manager does not persist the certificates
-	// we have to retrieve it from the identity manager
-	si, err := w.identityMgr.GetSigningIdentity(username)
-	if err != nil && err != msp.ErrUserNotFound {
+	si, err := extIdentity.NewSigningIdentity(w.extWalletConfig.MspId, newId.Name, w.extWalletConfig.Addr)
+	if err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
+
+	// the SDK identity manager does not persist the certificates
+	// we have to retrieve it from the identity manager
+	// si, err := w.identityMgr.GetSigningIdentity(username)
+	// if err != nil && err != msp.ErrUserNotFound {
+	// 	return nil, restutil.NewRestError(err.Error(), 500)
+	// }
 	if err == nil {
 		// the user may have been enrolled by a different client instance
+		// ecert := si.EnrollmentCertificate()
 		ecert := si.EnrollmentCertificate()
+		fmt.Printf("ECERT: %s\n", ecert)
 		mspId := si.Identifier().MSPID
 		newId.MSPID = mspId
 		newId.EnrollmentCert = ecert

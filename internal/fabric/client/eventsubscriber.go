@@ -27,8 +27,11 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/service/blockfilter/headertypefilter"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,14 +45,19 @@ type eventClientWrapper struct {
 	idClient           IdentityClient
 	eventClientCreator eventClientCreator
 	mu                 sync.Mutex
+
+	extWalletConfig ewConfig.WalletConfig
 }
 
-func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
+func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient, wc conf.ExternalWalletConf) *eventClientWrapper {
+	configBackend, _ := configProvider()
 	w := &eventClientWrapper{
 		sdk:                sdk,
 		idClient:           idClient,
 		eventClients:       make(map[string]map[string]*event.Client),
 		eventClientCreator: createEventClient,
+
+		extWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
 	}
 
 	idClient.AddSignerUpdateListener(w)
@@ -114,7 +122,11 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 		if chaincodeId != "" {
 			eventOpts = append(eventOpts, event.WithChaincodeID(chaincodeId))
 		}
-		channelProvider := e.sdk.ChannelContext(channelId, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithUser(signer))
+		id, err := extIdentity.NewSigningIdentity(e.extWalletConfig.MspId, signer, e.extWalletConfig.Addr)
+		if err != nil {
+			return nil, errors.Errorf("Failed to get signing identity: %s", err)
+		}
+		channelProvider := e.sdk.ChannelContext(channelId, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithIdentity(id))
 		eventClient, err = e.eventClientCreator(channelProvider, eventOpts...)
 		if err != nil {
 			return nil, err

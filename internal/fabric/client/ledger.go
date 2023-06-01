@@ -25,7 +25,11 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
+	remoteIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
+
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
 )
 
@@ -39,14 +43,19 @@ type ledgerClientWrapper struct {
 	idClient            IdentityClient
 	ledgerClientCreator ledgerClientCreator
 	mu                  sync.Mutex
+
+	extWalletConfig ewConfig.WalletConfig
 }
 
-func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *ledgerClientWrapper {
+func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient, wc conf.ExternalWalletConf) *ledgerClientWrapper {
+	configBackend, _ := configProvider()
 	w := &ledgerClientWrapper{
 		sdk:                 sdk,
 		idClient:            idClient,
 		ledgerClients:       make(map[string]map[string]*ledger.Client),
 		ledgerClientCreator: createLedgerClient,
+
+		extWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
 	}
 	idClient.AddSignerUpdateListener(w)
 	return w
@@ -128,7 +137,12 @@ func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerC
 	}
 	ledgerClient = ledgerClientsForSigner[channelId]
 	if ledgerClient == nil {
-		channelProvider := l.sdk.ChannelContext(channelId, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithUser(signer))
+		id, err := remoteIdentity.NewSigningIdentity(l.extWalletConfig.MspId, signer, l.extWalletConfig.Addr)
+		if err != nil {
+			return nil, errors.Errorf("Failed to get signing identity: %s", err)
+		}
+
+		channelProvider := l.sdk.ChannelContext(channelId, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithIdentity(id))
 		ledgerClient, err = l.ledgerClientCreator(channelProvider)
 		if err != nil {
 			return nil, err

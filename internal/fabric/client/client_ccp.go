@@ -29,7 +29,10 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
+	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,9 +51,11 @@ type ccpRPCWrapper struct {
 	// one channel client per channel ID, per signer ID
 	channelClients map[string](map[string]*ccpClientWrapper)
 	mu             sync.Mutex
+
+	remoteWalletConfig ewConfig.WalletConfig
 }
 
-func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, userStore msp.UserStore, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
+func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, userStore msp.UserStore, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper, wc conf.ExternalWalletConf) (RPCClient, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 	identityConfig, err := mspImpl.ConfigFromBackend(configBackend...)
@@ -76,6 +81,8 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 		cryptoSuiteConfig: cryptoConfig,
 		userStore:         userStore,
 		channelClients:    make(map[string]map[string]*ccpClientWrapper),
+
+		remoteWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
 	}
 
 	idClient.AddSignerUpdateListener(w)
@@ -143,7 +150,12 @@ func (w *ccpRPCWrapper) SignerUpdated(signer string) {
 func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpClientWrapper, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	id, err := w.idClient.GetSigningIdentity(signer)
+
+	// id, err := w.idClient.GetSigningIdentity(signer)
+	id, err := extIdentity.NewSigningIdentity(w.remoteWalletConfig.MspId, signer, w.remoteWalletConfig.Addr)
+	if err != nil {
+		return nil, errors.Errorf("Failed to get signing identity: %s", err)
+	}
 	if err == msp.ErrUserNotFound {
 		return nil, errors.Errorf("Signer %s does not exist", signer)
 	}
@@ -157,7 +169,7 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 	}
 	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
 	if clientOfUser == nil {
-		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(w.idClient.GetClientOrg()), fabsdk.WithUser(id.Identifier().ID))
+		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(w.idClient.GetClientOrg()), fabsdk.WithIdentity(id))
 		cClient, err := w.channelCreator(channelProvider)
 		if err != nil {
 			return nil, err

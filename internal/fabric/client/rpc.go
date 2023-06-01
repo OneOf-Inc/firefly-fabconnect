@@ -32,13 +32,13 @@ import (
 // - "useGatewayClient: false": returned RPCClient uses a static network map described by the Connection Profile
 // - "useGatewayServer: true": for Fabric 2.4 node only, the returned RPCClient utilizes the server-side gateway service
 //
-func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClient, error) {
+func RPCConnect(c conf.RPCConf, txTimeout int, wc conf.ExternalWalletConf) (RPCClient, identity.IdentityClient, error) {
 	configProvider := config.FromFile(c.ConfigPath)
 	userStore, err := newUserstore(configProvider)
 	if err != nil {
 		return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	}
-	identityClient, err := newIdentityClient(configProvider, userStore)
+	identityClient, err := newIdentityClient(configProvider, userStore, wc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -46,17 +46,17 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to initialize a new SDK instance. %s", err)
 	}
-	ledgerClient := newLedgerClient(configProvider, sdk, identityClient)
-	eventClient := newEventClient(configProvider, sdk, identityClient)
+	ledgerClient := newLedgerClient(configProvider, sdk, identityClient, wc)
+	eventClient := newEventClient(configProvider, sdk, identityClient, wc)
 	var rpcClient RPCClient
 	if !c.UseGatewayClient && !c.UseGatewayServer {
-		rpcClient, err = newRPCClientFromCCP(configProvider, txTimeout, userStore, identityClient, ledgerClient, eventClient)
+		rpcClient, err = newRPCClientFromCCP(configProvider, txTimeout, userStore, identityClient, ledgerClient, eventClient, wc)
 		if err != nil {
 			return nil, nil, err
 		}
 		log.Info("Using static connection profile mode of the RPC client")
 	} else if c.UseGatewayClient {
-		rpcClient, err = newRPCClientWithClientSideGateway(configProvider, txTimeout, identityClient, ledgerClient, eventClient)
+		rpcClient, err = newRPCClientWithClientSideGateway(configProvider, txTimeout, identityClient, ledgerClient, eventClient, wc)
 		if err != nil {
 			return nil, nil, err
 		}

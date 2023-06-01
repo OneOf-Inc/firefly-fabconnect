@@ -27,7 +27,12 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
+	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -51,9 +56,12 @@ type gwRPCWrapper struct {
 	// one channel client per signer per channel
 	gwChannelClients map[string]map[string]*channel.Client
 	mu               sync.Mutex
+
+	remoteWalletConfig ewConfig.WalletConfig
 }
 
-func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTimeout int, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
+func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTimeout int, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper, wc conf.ExternalWalletConf) (RPCClient, error) {
+	configBackend, _ := configProvider()
 	w := &gwRPCWrapper{
 		commonRPCWrapper: &commonRPCWrapper{
 			txTimeout:           txTimeout,
@@ -70,6 +78,8 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 		gwClients:        make(map[string]*gateway.Gateway),
 		gwGatewayClients: make(map[string]map[string]*gateway.Network),
 		gwChannelClients: make(map[string]map[string]*channel.Client),
+
+		remoteWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
 	}
 
 	idClient.AddSignerUpdateListener(w)
@@ -225,7 +235,12 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 		if err != nil {
 			return nil, err
 		}
-		clientChannelContext := sdk.ChannelContext(channelId, fabsdk.WithUser(signer), fabsdk.WithOrg(org))
+
+		id, err := extIdentity.NewSigningIdentity(w.remoteWalletConfig.MspId, signer, w.remoteWalletConfig.Addr)
+		if err != nil {
+			return nil, errors.Errorf("Failed to get signing identity: %s", err)
+		}
+		clientChannelContext := sdk.ChannelContext(channelId, fabsdk.WithIdentity(id), fabsdk.WithOrg(org))
 		// Channel client is used to query and execute transactions (Org1 is default org)
 		channelClient, err = w.channelCreator(clientChannelContext)
 		if err != nil {
@@ -237,7 +252,13 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 }
 
 func createGateway(configProvider core.ConfigProvider, signer string, txTimeout int) (*gateway.Gateway, error) {
-	return gateway.Connect(gateway.WithConfig(configProvider), gateway.WithUser(signer), gateway.WithTimeout(time.Duration(txTimeout)*time.Second))
+	// ToDo: Use WithIdentity
+	id, err := extIdentity.NewSigningIdentity("Org1MSP", signer, "oneof_wallet:4000")
+	if err != nil {
+		return nil, errors.Errorf("Failed to get signing identity: %s", err)
+	}
+	// wid := remoteWallet.NewWalletIdentity(signer, "Org1MSP", "oneof_wallet:4000")
+	return gateway.Connect(gateway.WithConfig(configProvider), gateway.WithSigningIdentity(id), gateway.WithTimeout(time.Duration(txTimeout)*time.Second))
 }
 
 func getNetwork(gateway *gateway.Gateway, channelId string) (*gateway.Network, error) {

@@ -124,7 +124,6 @@ func (w *WalletApiHandler) Register(regReq *mspApi.RegistrationRequest) (string,
 }
 
 func (w *WalletApiHandler) Enroll(enrollmentID string) ([]byte, error) {
-	// send POST request to http://oneof_wallet:4000/fabric/identities/:username/enroll
 	posturl := fmt.Sprintf("%s/fabric-cryptosuit/identities/%s/%s/enroll", w.addr, w.mspId, enrollmentID)
 
 	body := []byte(`{}`)
@@ -152,7 +151,6 @@ func (w *WalletApiHandler) Enroll(enrollmentID string) ([]byte, error) {
 
 func (w *WalletApiHandler) Revoke(revokeReq mspApi.RevocationRequest) (*mspApi.RevocationResponse, error) {
 	fmt.Printf("revokeReq: %s\n", revokeReq.Name)
-	// send POST request to http://oneof_wallet:4000/fabric/identities/:username/revoke
 	posturl := fmt.Sprintf("%s/fabric-cryptosuit/identities/%s/%s/revoke", w.addr, w.mspId, revokeReq.Name)
 
 	body := []byte(`{}`)

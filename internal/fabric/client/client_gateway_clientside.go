@@ -37,7 +37,7 @@ import (
 )
 
 // defined to allow mocking in tests
-type gatewayCreator func(core.ConfigProvider, string, int) (*gateway.Gateway, error)
+type gatewayCreator func(core.ConfigProvider, string, int, ewConfig.WalletConfig) (*gateway.Gateway, error)
 type networkCreator func(*gateway.Gateway, string) (*gateway.Network, error)
 type txPreparer func(*gwRPCWrapper, string, string, string, string, bool, map[string][]byte) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error)
 type txSubmitter func(*gateway.Transaction, ...string) ([]byte, error)
@@ -195,7 +195,7 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 	if gatewayClientsForSigner == nil {
 		// no channel clients have been created for this signer at all
 		// we will not have created a gateway client for this user either
-		gatewayClient, err := w.gatewayCreator(w.configProvider, signer, w.txTimeout)
+		gatewayClient, err := w.gatewayCreator(w.configProvider, signer, w.txTimeout, w.remoteWalletConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -251,13 +251,12 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 	return channelClient, nil
 }
 
-func createGateway(configProvider core.ConfigProvider, signer string, txTimeout int) (*gateway.Gateway, error) {
+func createGateway(configProvider core.ConfigProvider, signer string, txTimeout int, walletConf ewConfig.WalletConfig) (*gateway.Gateway, error) {
 	// ToDo: Use WithIdentity
-	id, err := extIdentity.NewSigningIdentity("Org1MSP", signer, "oneof_wallet:4000")
+	id, err := extIdentity.NewSigningIdentity(walletConf.MspId, signer, walletConf.Addr)
 	if err != nil {
 		return nil, errors.Errorf("Failed to get signing identity: %s", err)
 	}
-	// wid := remoteWallet.NewWalletIdentity(signer, "Org1MSP", "oneof_wallet:4000")
 	return gateway.Connect(gateway.WithConfig(configProvider), gateway.WithSigningIdentity(id), gateway.WithTimeout(time.Duration(txTimeout)*time.Second))
 }
 

@@ -30,7 +30,6 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/keyvaluestore"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
@@ -39,8 +38,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	walletApi "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/api"
-	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 )
 
 type identityManagerProvider struct {
@@ -61,7 +60,7 @@ type idClientWrapper struct {
 	extWalletConfig ewConfig.WalletConfig
 }
 
-func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, wc conf.ExternalWalletConf) (*idClientWrapper, error) {
+func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 	cs, err := sw.GetSuiteByConfig(cryptoConfig)
@@ -111,7 +110,7 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 		listeners:      listeners,
 	}
 
-	idc.extWalletConfig = ewConfig.NewWalletConfig(wc.Addr, configBackend...)
+	idc.extWalletConfig = ewConfig.NewWalletConfig(configBackend...)
 
 	return idc, nil
 }
@@ -265,8 +264,6 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 		Name:    enreq.Name,
 		Success: true,
 	}
-
-	
 
 	w.notifySignerUpdate(username)
 	return &result, nil

@@ -89,7 +89,7 @@ func (g *RESTGateway) Init() error {
 		return err
 	}
 
-	rpcClient, identityClient, err := client.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime, g.config.ExternalWalletConf)
+	rpcClient, identityClient, err := client.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
 	if err != nil {
 		return err
 	}

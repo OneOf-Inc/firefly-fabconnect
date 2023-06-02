@@ -29,10 +29,9 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
-	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,7 +54,7 @@ type ccpRPCWrapper struct {
 	remoteWalletConfig ewConfig.WalletConfig
 }
 
-func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, userStore msp.UserStore, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper, wc conf.ExternalWalletConf) (RPCClient, error) {
+func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, userStore msp.UserStore, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 	identityConfig, err := mspImpl.ConfigFromBackend(configBackend...)
@@ -82,7 +81,7 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 		userStore:         userStore,
 		channelClients:    make(map[string]map[string]*ccpClientWrapper),
 
-		remoteWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
+		remoteWalletConfig: ewConfig.NewWalletConfig(configBackend...),
 	}
 
 	idClient.AddSignerUpdateListener(w)

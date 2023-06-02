@@ -27,7 +27,6 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/service/blockfilter/headertypefilter"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
@@ -49,7 +48,7 @@ type eventClientWrapper struct {
 	extWalletConfig ewConfig.WalletConfig
 }
 
-func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient, wc conf.ExternalWalletConf) *eventClientWrapper {
+func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
 	configBackend, _ := configProvider()
 	w := &eventClientWrapper{
 		sdk:                sdk,
@@ -57,7 +56,7 @@ func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, i
 		eventClients:       make(map[string]map[string]*event.Client),
 		eventClientCreator: createEventClient,
 
-		extWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
+		extWalletConfig: ewConfig.NewWalletConfig(configBackend...),
 	}
 
 	idClient.AddSignerUpdateListener(w)

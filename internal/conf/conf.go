@@ -38,7 +38,7 @@ type RESTGatewayConf struct {
 	Events             EventstreamConf    `mapstructure:"events"`
 	HTTP               HTTPConf           `mapstructure:"http"`
 	RPC                RPCConf            `mapstructure:"rpc"`
-	ExternalWalletConf ExternalWalletConf `mapstructure:"wallet"`
+	// ExternalWalletConf ExternalWalletConf `mapstructure:"wallet"`
 }
 
 // KafkaConf - Common configuration for Kafka
@@ -113,9 +113,9 @@ type TLSConfig struct {
 }
 
 // External Wallet Config
-type ExternalWalletConf struct {
-	Addr string `mapstructure:"addr"`
-}
+// type ExternalWalletConf struct {
+// 	Addr string `mapstructure:"addr"`
+// }
 
 // CobraInitRPC sets the standard command-line parameters for RPC
 func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
@@ -186,6 +186,6 @@ func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 	cmd.Flags().BoolVarP(&conf.RPC.UseGatewayServer, "gateway-server", "", false, "Whether to use the server-side gateway support when sending transactions (Fabric 2.4 or later only)")
 	_ = viper.BindPFlag("rpc.useGatewayServer", cmd.Flags().Lookup("gateway-server"))
 
-	cmd.Flags().StringVarP(&conf.ExternalWalletConf.Addr, "remote-wallet-addr", "W", "", "Remote Wallet Address")
-	_ = viper.BindPFlag("wallet.addr", cmd.Flags().Lookup("remote-wallet-addr"))
+	// cmd.Flags().StringVarP(&conf.ExternalWalletConf.Addr, "remote-wallet-addr", "W", "", "Remote Wallet Address")
+	// _ = viper.BindPFlag("wallet.addr", cmd.Flags().Lookup("remote-wallet-addr"))
 }

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config/lookup"
 	"github.com/hyperledger/fabric-sdk-go/pkg/msp"
@@ -12,7 +14,7 @@ type WalletConfig struct {
 	UserStorePath string
 }
 
-func NewWalletConfig(addr string, c ...core.ConfigBackend) WalletConfig {
+func NewWalletConfig(c ...core.ConfigBackend) WalletConfig {
 	l := lookup.New(c...)
 
 	var client msp.ClientConfig
@@ -25,7 +27,7 @@ func NewWalletConfig(addr string, c ...core.ConfigBackend) WalletConfig {
 	mspId := orgs[organization]["mspid"]
 
 	return WalletConfig{
-		Addr:          addr,
+		Addr:          os.Getenv("EXT_WALLET_ADDR"),
 		MspId:         mspId.(string),
 		UserStorePath: credntialStore,
 	}

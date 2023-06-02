@@ -25,7 +25,6 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
 	remoteIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
@@ -47,7 +46,7 @@ type ledgerClientWrapper struct {
 	extWalletConfig ewConfig.WalletConfig
 }
 
-func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient, wc conf.ExternalWalletConf) *ledgerClientWrapper {
+func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *ledgerClientWrapper {
 	configBackend, _ := configProvider()
 	w := &ledgerClientWrapper{
 		sdk:                 sdk,
@@ -55,7 +54,7 @@ func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, 
 		ledgerClients:       make(map[string]map[string]*ledger.Client),
 		ledgerClientCreator: createLedgerClient,
 
-		extWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
+		extWalletConfig: ewConfig.NewWalletConfig(configBackend...),
 	}
 	idClient.AddSignerUpdateListener(w)
 	return w

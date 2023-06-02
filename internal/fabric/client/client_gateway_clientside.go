@@ -27,11 +27,10 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 
-	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 	ewConfig "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/config"
+	extIdentity "github.com/hyperledger/firefly-fabconnect/internal/fabric/ext-wallet/identity"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -60,7 +59,7 @@ type gwRPCWrapper struct {
 	remoteWalletConfig ewConfig.WalletConfig
 }
 
-func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTimeout int, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper, wc conf.ExternalWalletConf) (RPCClient, error) {
+func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTimeout int, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
 	configBackend, _ := configProvider()
 	w := &gwRPCWrapper{
 		commonRPCWrapper: &commonRPCWrapper{
@@ -79,7 +78,7 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 		gwGatewayClients: make(map[string]map[string]*gateway.Network),
 		gwChannelClients: make(map[string]map[string]*channel.Client),
 
-		remoteWalletConfig: ewConfig.NewWalletConfig(wc.Addr, configBackend...),
+		remoteWalletConfig: ewConfig.NewWalletConfig(configBackend...),
 	}
 
 	idClient.AddSignerUpdateListener(w)

@@ -21,7 +21,7 @@ func test_init() (*Transit, error) {
 	if err != nil {
 		return nil, err
 	}
-	tr := c.TransitWithMountPoint(&TransitConfig{MountPoint: "transit"})
+	tr := c.TransitWithConfig(&TransitConfig{MountPoint: "transit"})
 
 	return tr, nil
 }

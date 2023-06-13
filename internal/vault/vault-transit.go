@@ -34,7 +34,7 @@ func WithTransitConfigFromEnv() (*TransitConfig) {
 	}
 }
 
-func (c *Client) TransitWithMountPoint(cfg *TransitConfig) *Transit {
+func (c *Client) TransitWithConfig(cfg *TransitConfig) *Transit {
 	return &Transit{c, cfg}
 }
 

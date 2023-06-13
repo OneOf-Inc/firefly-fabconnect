@@ -16,6 +16,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/vault/api v1.9.2 // indirect
 	github.com/hashicorp/vault/api/auth/approle v0.4.1 // indirect
+	github.com/hyperledger/fabric v2.1.1+incompatible // indirect
 	github.com/hyperledger/fabric-config v0.0.7 // indirect
 	github.com/hyperledger/fabric-protos-go v0.0.0-20211118165945-23d738fc3553
 	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220617091732-e170b98fa821

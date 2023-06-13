@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/approle"
@@ -40,4 +41,13 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 
 	return &Client{client: client}, nil
+}
+
+func WithConfigFromEnv() (*Client, error) {
+	cfg := &Config{
+		Address:  os.Getenv("VAULT_ADDR"),
+		RoleID:   os.Getenv("VAULT_ROLE_ID"),
+		SecretID: os.Getenv("VAULT_SECRET_ID"),
+	}
+	return NewClient(cfg)
 }

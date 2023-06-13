@@ -3,22 +3,28 @@ package vault
 import (
 	"context"
 	"fmt"
+	"os"
 )
 
-type Secret struct {
-	c          *Client
+type SecretsConfig struct {
 	MountPoint string
 }
 
-func (c *Client) SecretWithMountPoint(MountPoint string) *Secret {
-	return &Secret{
-		c:          c,
-		MountPoint: MountPoint,
-	}
+type Secret struct {
+	c   *Client
+	cfg *SecretsConfig
+}
+
+func WithSecretsConfigFromEnv() *SecretsConfig {
+	return &SecretsConfig{MountPoint: os.Getenv("VAULT_SECRETS_MOUNT_POINT")}
+}
+
+func (c *Client) SecretWithMountPoint(cfg *SecretsConfig) *Secret {
+	return &Secret{c, cfg}
 }
 
 func (s *Secret) ReadSecret(path string) (map[string]interface{}, error) {
-	secret, err := s.c.client.KVv2(s.MountPoint).Get(context.Background(), path)
+	secret, err := s.c.client.KVv2(s.cfg.MountPoint).Get(context.Background(), path)
 	if err != nil {
 		return nil, err
 	}
@@ -29,6 +35,6 @@ func (s *Secret) ReadSecret(path string) (map[string]interface{}, error) {
 }
 
 func (s *Secret) WriteSecret(path string, data map[string]interface{}) error {
-	_, err := s.c.client.KVv2(s.MountPoint).Put(context.Background(), path, data)
+	_, err := s.c.client.KVv2(s.cfg.MountPoint).Put(context.Background(), path, data)
 	return err
 }

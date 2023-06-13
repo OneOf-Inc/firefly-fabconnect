@@ -8,14 +8,19 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/google/tink/go/kwp/subtle"
 )
 
-type Transit struct {
-	c          *Client
+type TransitConfig struct {
 	MountPoint string
+}
+
+type Transit struct {
+	c   *Client
+	cfg *TransitConfig
 }
 
 type SignOpts struct {
@@ -23,15 +28,18 @@ type SignOpts struct {
 	Hash       string
 }
 
-func (c *Client) TransitWithMountPoint(MountPoint string) *Transit {
-	return &Transit{
-		c:          c,
-		MountPoint: MountPoint,
+func WithTransitConfigFromEnv() (*TransitConfig) {
+	return &TransitConfig{
+		MountPoint: os.Getenv("VAULT_TRANSIT_MOUNT_POINT"),
 	}
 }
 
+func (c *Client) TransitWithMountPoint(cfg *TransitConfig) *Transit {
+	return &Transit{c, cfg}
+}
+
 func (t *Transit) CreateKey(keyName string, keyType string) error {
-	_, err := t.c.client.Logical().Write(fmt.Sprintf("%s/keys/%s", t.MountPoint, keyName), map[string]interface{}{
+	_, err := t.c.client.Logical().Write(fmt.Sprintf("%s/keys/%s", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"type": keyType,
 	})
 	if err != nil {
@@ -51,7 +59,7 @@ func (t *Transit) Import(keyName string, keyType string, key []byte) error {
 		return fmt.Errorf("failed to wrap key")
 	}
 
-	_, err = t.c.client.Logical().Write(fmt.Sprintf("%s/keys/%s/import", t.MountPoint, keyName), map[string]interface{}{
+	_, err = t.c.client.Logical().Write(fmt.Sprintf("%s/keys/%s/import", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"ciphertext":    ciphertext,
 		"type":          keyType,
 		"hash_function": "SHA256",
@@ -65,7 +73,7 @@ func (t *Transit) Import(keyName string, keyType string, key []byte) error {
 }
 
 func (t *Transit) GetWrappingKey() (string, error) {
-	s, err := t.c.client.Logical().Read(fmt.Sprintf("%s/wrapping_key", t.MountPoint))
+	s, err := t.c.client.Logical().Read(fmt.Sprintf("%s/wrapping_key", t.cfg.MountPoint))
 	if err != nil {
 		return "", err
 	}
@@ -76,7 +84,7 @@ func (t *Transit) GetWrappingKey() (string, error) {
 }
 
 func (t *Transit) GetKey(keyName string) (map[string]interface{}, error) {
-	s, err := t.c.client.Logical().Read(fmt.Sprintf("%s/keys/%s", t.MountPoint, keyName))
+	s, err := t.c.client.Logical().Read(fmt.Sprintf("%s/keys/%s", t.cfg.MountPoint, keyName))
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +95,7 @@ func (t *Transit) GetKey(keyName string) (map[string]interface{}, error) {
 }
 
 func (t *Transit) Sign(keyName string, input []byte, opts *SignOpts) ([]byte, error) {
-	s, err := t.c.client.Logical().Write(fmt.Sprintf("%s/sign/%s", t.MountPoint, keyName), map[string]interface{}{
+	s, err := t.c.client.Logical().Write(fmt.Sprintf("%s/sign/%s", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"input":          base64.StdEncoding.EncodeToString(input),
 		"prehashed":      opts.Preshashed,
 		"hash_algorithm": opts.Hash,
@@ -113,7 +121,7 @@ func (t *Transit) Verify(keyName string, input []byte, signature []byte, opts *S
 	fmt.Printf("vault:v1:%s\n", base64.StdEncoding.EncodeToString(signature))
 	fmt.Printf("prehashed:%v\n", keyName)
 
-	s, err := t.c.client.Logical().Write(fmt.Sprintf("%s/verify/%s", t.MountPoint, "95788e65-3fdf-4209-7b75-56f0c9ddf506"), map[string]interface{}{
+	s, err := t.c.client.Logical().Write(fmt.Sprintf("%s/verify/%s", t.cfg.MountPoint, "95788e65-3fdf-4209-7b75-56f0c9ddf506"), map[string]interface{}{
 		"input":          base64.StdEncoding.EncodeToString(input),
 		"signature":      fmt.Sprintf("vault:v1:%s", base64.StdEncoding.EncodeToString(signature)),
 		"prehashed":      opts.Preshashed,

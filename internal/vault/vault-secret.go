@@ -19,7 +19,7 @@ func WithSecretsConfigFromEnv() *SecretsConfig {
 	return &SecretsConfig{MountPoint: os.Getenv("VAULT_SECRETS_MOUNT_POINT")}
 }
 
-func (c *Client) SecretWithMountPoint(cfg *SecretsConfig) *Secret {
+func (c *Client) SecretWithConfig(cfg *SecretsConfig) *Secret {
 	return &Secret{c, cfg}
 }
 

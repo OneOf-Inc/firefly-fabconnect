@@ -13,7 +13,7 @@ func init_secret_tests() (*Secret, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := c.SecretWithMountPoint(&SecretsConfig{MountPoint: "secret"})
+	s := c.SecretWithConfig(&SecretsConfig{MountPoint: "secret"})
 
 	return s, nil
 }

@@ -8,24 +8,18 @@ import (
 )
 
 type VaultWallet struct {
-	v     *vault.Client
-	t     *vault.Transit
-	s     *vault.Secret
+	v     *vault.Vault
 	mspid string
 }
 
-func NewVaultWallet(mspid string, cfg *vault.Config, transitConfig *vault.TransitConfig, secretsConfig *vault.SecretsConfig) (*VaultWallet, error) {
-	v, err := vault.NewClient(cfg)
+func NewVaultWallet(mspid string, cfg *vault.Config) (*VaultWallet, error) {
+	v, err := vault.New(cfg)
 	if err != nil {
 		return nil, err
 	}
-	vaultTransit := v.TransitWithConfig(transitConfig)
-	vaultSecret := v.SecretWithConfig(secretsConfig)
 
 	return &VaultWallet{
 		v:     v,
-		t:     vaultTransit,
-		s:     vaultSecret,
 		mspid: mspid,
 	}, nil
 }
@@ -37,12 +31,12 @@ func (vw *VaultWallet) Put(label string, content []byte) error {
 	}
 
 	keypath := fmt.Sprintf("%s/%s", vw.mspid, label)
-	if err := vw.t.Import(keypath, "ecdsa-p256", []byte(x.Credentials.Key)); err != nil {
+	if err := vw.v.Transit().ImportKey(keypath, "ecdsa-p256", []byte(x.Credentials.Key)); err != nil {
 		return fmt.Errorf("failed to import key: %w", err)
 	}
 
 	certpath := fmt.Sprintf("%s/certs/%s", vw.mspid, label)
-	if err := vw.s.WriteSecret(certpath, map[string]interface{}{
+	if err := vw.v.Secret().WriteSecret(certpath, map[string]interface{}{
 		"certificate": x.Credentials.Certificate,
 	}); err != nil {
 		return fmt.Errorf("failed to write certificate: %w", err)
@@ -54,7 +48,7 @@ func (vw *VaultWallet) Put(label string, content []byte) error {
 func (vw *VaultWallet) Get(label string) ([]byte, error) {
 	certpath := fmt.Sprintf("%s/certs/%s", vw.mspid, label)
 
-	s, err := vw.s.ReadSecret(certpath)
+	s, err := vw.v.Secret().ReadSecret(certpath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate: %w", err)
 	}

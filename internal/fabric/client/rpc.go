@@ -23,6 +23,9 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	log "github.com/sirupsen/logrus"
+
+	vault_msp "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/msp"
+
 )
 
 //
@@ -34,7 +37,13 @@ import (
 //
 func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClient, error) {
 	configProvider := config.FromFile(c.ConfigPath)
-	userStore, err := newUserstore(configProvider)
+
+
+	// userStore, err := newUserstore(configProvider)
+	// if err != nil {
+	// 	return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
+	// }
+	userStore, err := vault_msp.NewCertVaultUserStore("Org1MSP/certs")
 	if err != nil {
 		return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	}

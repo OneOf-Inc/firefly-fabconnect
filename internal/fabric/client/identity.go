@@ -25,16 +25,20 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	fabcontext "github.com/hyperledger/fabric-sdk-go/pkg/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
-	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/bccsp/sw"
 	fabImpl "github.com/hyperledger/fabric-sdk-go/pkg/fab"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
+	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+
+	vault_cs "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/cryptosuite"
+	vault_msp "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/msp"
+	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type identityManagerProvider struct {
@@ -56,10 +60,21 @@ type idClientWrapper struct {
 func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
-	cs, err := sw.GetSuiteByConfig(cryptoConfig)
+
+	// cs, err := sw.GetSuiteByConfig(cryptoConfig)
+
+	db := kvstore.NewLDBKeyValueStore("/home/hossein/workspace/oneof/firefly-fabconnect/db")
+	if err := db.Init(); err != nil {
+		return nil, errors.Errorf("Failed to initialize db: %s", err)
+	}
+	cs, err := vault_cs.NewCryptoSuite(&vault_cs.CryptoSuiteVaultConfig{
+		VaultConfig:   vault.WithConfigFromEnv(),
+		DB:            db,
+	})
 	if err != nil {
 		return nil, errors.Errorf("Failed to get suite by config: %s", err)
 	}
+
 	endpointConfig, err := fabImpl.ConfigFromBackend(configBackend...)
 	if err != nil {
 		return nil, errors.Errorf("Failed to read config: %s", err)
@@ -72,7 +87,13 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 	if clientConfig.CredentialStore.Path == "" {
 		return nil, errors.Errorf("User credentials store path is empty")
 	}
-	mgr, err := mspImpl.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig)
+	// mgr, err := mspImpl.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig)
+
+	v, err := vault.New(vault.WithConfigFromEnv())
+	if err != nil {
+		return nil, errors.Errorf("Failed to create vault client: %s", err)
+	}
+	mgr, err := vault_msp.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig, v, db)
 	if err != nil {
 		return nil, errors.Errorf("Identity manager creation failed. %s", err)
 	}

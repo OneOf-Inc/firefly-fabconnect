@@ -1,4 +1,4 @@
-package identity
+package msp
 
 import (
 	"crypto/ecdsa"
@@ -6,29 +6,26 @@ import (
 	"encoding/pem"
 	"errors"
 
-	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
+	fabcore "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric/bccsp/utils"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
 )
 
 type SigningIdentity struct {
 	*Identity
 
-	tr *vault.Transit
+	v *vault.Vault
 }
 
-func NewSigningIdentityManager(cfg *vault.Config, transitConfig *vault.TransitConfig) (*SigningIdentity, error) {
-	v, err := vault.NewClient(cfg)
+func WithVaultConfig(cfg *vault.Config) (*SigningIdentity, error) {
+	v, err := vault.New(cfg)
 	if err != nil {
 		return nil, err
 	}
-	vaultTransit := v.TransitWithConfig(transitConfig)
-
-	return &SigningIdentity{
-		tr: vaultTransit,
-	}, nil
+	return &SigningIdentity{v: v}, nil
 }
 
 // NewSigningIdentity initializes SigningIdentity
@@ -47,9 +44,9 @@ func (s *SigningIdentity) NewSigningIdentity(mspid, user, cert string) (*Signing
 	}
 	identity := &SigningIdentity{
 		Identity: &Identity{
-			MSPID:        mspid,
-			Key:          &Key{ID: user, PubKey: ecdsaPubKey},
-			IDBytes:      []byte(cert),
+			MSPID:   mspid,
+			Key:     &core.Key{ID: user, PubKey: ecdsaPubKey},
+			IDBytes: []byte(cert),
 		},
 	}
 
@@ -77,6 +74,6 @@ func (s *SigningIdentity) PublicVersion() msp.Identity {
 }
 
 // PrivateKey returns the crypto suite representation of the private key
-func (s *SigningIdentity) PrivateKey() core.Key {
+func (s *SigningIdentity) PrivateKey() fabcore.Key {
 	return s.Key
 }

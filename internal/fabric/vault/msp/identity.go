@@ -1,4 +1,4 @@
-package identity
+package msp
 
 import (
 	"fmt"
@@ -6,12 +6,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
 )
 
 type Identity struct {
 	MSPID   string    `protobuf:"bytes,1,opt,name=mspid,proto3" json:"mspid,omitempty"`
 	IDBytes []byte    `protobuf:"bytes,2,opt,name=idBytes,proto3" json:"idBytes,omitempty"`
-	Key     *Key `json:"-"`
+	Key     *core.Key `json:"-"`
 
 	VaultTransit *vault.Transit
 }

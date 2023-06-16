@@ -5,29 +5,32 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"fmt"
 	"testing"
 
 	uuid "github.com/nu7hatch/gouuid"
 )
 
-func test_init() (*Transit, error) {
+func test_init() (*Vault, error) {
 	var cfg = &Config{
 		Address:  "http://localhost:8200",
-		RoleID:   "8c89a98e-db84-be76-a00c-c9b31fc9791a",
-		SecretID: "e6a38fb2-ab73-c5ef-04c3-daef6db5b679",
+		RoleID:   "84860544-65ea-5829-5636-c1b1e2153cdc",
+		SecretID: "349e03c3-20e9-d426-f452-6e2c2d7162b5",
+		TransitConfig: &TransitConfig{
+			MountPoint: "transit",
+		},
 	}
 
-	c, err := NewClient(cfg)
+	v, err := New(cfg)
 	if err != nil {
 		return nil, err
 	}
-	tr := c.TransitWithConfig(&TransitConfig{MountPoint: "transit"})
 
-	return tr, nil
+	return v, nil
 }
 
 func Test_Transit(t *testing.T) {
-	tr, err := test_init()
+	v, err := test_init()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,12 +40,14 @@ func Test_Transit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tr.CreateKey(keyName.String(), "ecdsa-p256")
+	err = v.Transit().CreateKey(keyName.String(), "ecdsa-p256")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	key, err := tr.GetKey(keyName.String())
+	fmt.Printf("Key: %v\n", keyName.String())
+
+	key, err := v.Transit().GetKey(keyName.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,26 +59,29 @@ func Test_Transit(t *testing.T) {
 		Hash:       "sha2-256",
 	}
 
-	s, err := tr.Sign(keyName.String(), data, signOpts)
+	s, err := v.Transit().Sign(keyName.String(), data, signOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("Signature: %x\n", s)
 
-	v, err := tr.Verify(keyName.String(), data, s, signOpts)
+	fmt.Printf("Key: %v\n", keyName.String())
+
+
+	vrf, err := v.Transit().Verify(keyName.String(), data, s, signOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Verified: %v\n", v)
+	t.Logf("Verified: %v\n", vrf)
 }
 
 func Test_GetWrappingKey(t *testing.T) {
-	tr, err := test_init()
+	v, err := test_init()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	key, err := tr.GetWrappingKey()
+	key, err := v.Transit().getWrappingKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +89,7 @@ func Test_GetWrappingKey(t *testing.T) {
 }
 
 func Test_ImportKey(t *testing.T) {
-	tr, err := test_init()
+	v, err := test_init()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +109,7 @@ func Test_ImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tr.Import(keyName.String(), "ecdsa-p256", ecdsaPrivateKeyBytes)
+	err = v.Transit().ImportKey(keyName.String(), "ecdsa-p256", ecdsaPrivateKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

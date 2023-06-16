@@ -9,17 +9,22 @@ import (
 	auth "github.com/hashicorp/vault/api/auth/approle"
 )
 
-type Client struct {
+type Vault struct {
 	client *api.Client
+
+	transitCfg *TransitConfig
+	secretsCfg *SecretsConfig
 }
 
 type Config struct {
 	Address  string
 	RoleID   string
 	SecretID string
+	*TransitConfig
+	*SecretsConfig
 }
 
-func NewClient(cfg *Config) (*Client, error) {
+func New(cfg *Config) (*Vault, error) {
 	client, err := api.NewClient(&api.Config{
 		Address: cfg.Address,
 	})
@@ -40,14 +45,20 @@ func NewClient(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("no auth info was returned after login")
 	}
 
-	return &Client{client: client}, nil
+	return &Vault{
+		client:     client,
+		transitCfg: cfg.TransitConfig,
+		secretsCfg: cfg.SecretsConfig,
+	}, nil
 }
 
-func WithConfigFromEnv() (*Client, error) {
+func WithConfigFromEnv() *Config {
 	cfg := &Config{
-		Address:  os.Getenv("VAULT_ADDR"),
-		RoleID:   os.Getenv("VAULT_ROLE_ID"),
-		SecretID: os.Getenv("VAULT_SECRET_ID"),
+		Address:       os.Getenv("VAULT_ADDR"),
+		RoleID:        os.Getenv("VAULT_ROLE_ID"),
+		SecretID:      os.Getenv("VAULT_SECRET_ID"),
+		TransitConfig: WithTransitConfigFromEnv(),
+		SecretsConfig: WithSecretsConfigFromEnv(),
 	}
-	return NewClient(cfg)
+	return cfg
 }

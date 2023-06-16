@@ -4,63 +4,90 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"hash"
 
-	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
+	uuid "github.com/google/uuid"
+	fabcore "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric/bccsp/utils"
-	uuid "github.com/nu7hatch/gouuid"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/identity"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
+	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type CryptoSuite struct {
-	vaultTransit *vault.Transit
-	vaultSecret  *vault.Secret
+	vault *vault.Vault
 
-	keys map[string]core.Key
+	db kvstore.KVStore
+
+	keys map[string]fabcore.Key
 }
 
 type CryptoSuiteVaultConfig struct {
 	VaultConfig   *vault.Config
-	SecretsConfig *vault.SecretsConfig
-	TransitConfig *vault.TransitConfig
+	DB            kvstore.KVStore
 }
 
+const (
+	DefaultKeyType = "ecdsa-p256"
+)
+
 func NewCryptoSuite(cfg *CryptoSuiteVaultConfig) (*CryptoSuite, error) {
-	vc, err := vault.NewClient(cfg.VaultConfig)
+	v, err := vault.New(cfg.VaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %v", err)
 	}
 
 	cs := &CryptoSuite{
-		vaultTransit: vc.TransitWithConfig(cfg.TransitConfig),
-		vaultSecret:  vc.SecretWithConfig(cfg.SecretsConfig),
-		keys:         make(map[string]core.Key),
+		vault: v,
+		db:    cfg.DB,
+		keys:  make(map[string]fabcore.Key),
 	}
 
 	return cs, nil
 }
 
-func (c *CryptoSuite) KeyGen(opts core.KeyGenOpts) (k core.Key, err error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate UUID: %v", err)
-	}
-	keyName := id.String()
+func (c *CryptoSuite) KeyGen(opts fabcore.KeyGenOpts) (k fabcore.Key, err error) {
+	keyId := generateKeyId()
 
-	err = c.vaultTransit.CreateKey(keyName, "ecdsa-p256")
+	err = c.vault.Transit().CreateKey(keyId, DefaultKeyType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key: %v", err)
 	}
 
-	return
+	keypem, err := c.vault.Transit().GetKey(keyId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key: %v", err)
+	}
+
+	block, _ := pem.Decode([]byte(keypem))
+	if block == nil {
+		return nil, errors.New("cannot decode key")
+	}
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	ecdsaPubKey, ok := pubKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New("invalid key type, expecting ECDSA Public Key")
+	}
+
+	key := &core.Key{PubKey: ecdsaPubKey}
+	ski := hex.EncodeToString(key.SKI())
+	
+
+	c.keys[ski] = key
+
+	return key, nil
 }
 
 // KeyImport imports new key to CryptoSuite key store
-func (c *CryptoSuite) KeyImport(raw interface{}, opts core.KeyImportOpts) (k core.Key, err error) {
+func (c *CryptoSuite) KeyImport(raw interface{}, opts fabcore.KeyImportOpts) (k fabcore.Key, err error) {
 	switch raw.(type) {
 	case *x509.Certificate:
 		cert := raw.(*x509.Certificate)
@@ -69,18 +96,18 @@ func (c *CryptoSuite) KeyImport(raw interface{}, opts core.KeyImportOpts) (k cor
 			return nil, errors.New("invalid key type, it must be ECDSA Public Key")
 		}
 
-		err = c.vaultSecret.WriteSecret(fmt.Sprintf("certs/%s", cert.Subject.CommonName), map[string]interface{}{
+		err = c.vault.Secret().WriteSecret(fmt.Sprintf("certs/%s", cert.Subject.CommonName), map[string]interface{}{
 			"cert": string(cert.Raw),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to write secret: %v", err)
 		}
 
-		pk := &identity.Key{PubKey: pubKey}
+		pk := &core.Key{PubKey: pubKey}
 		c.keys[string(string(pk.SKI()))] = pk
 		return pk, nil
 	case *ecdsa.PublicKey:
-		pk := &identity.Key{PubKey: raw.(*ecdsa.PublicKey)}
+		pk := &core.Key{PubKey: raw.(*ecdsa.PublicKey)}
 		c.keys[string(string(pk.SKI()))] = pk
 		return pk, nil
 	default:
@@ -88,7 +115,7 @@ func (c *CryptoSuite) KeyImport(raw interface{}, opts core.KeyImportOpts) (k cor
 	}
 }
 
-func (c *CryptoSuite) GetKey(ski []byte) (k core.Key, err error) {
+func (c *CryptoSuite) GetKey(ski []byte) (k fabcore.Key, err error) {
 	key, ok := c.keys[string(ski)]
 	if !ok {
 		return nil, errors.New("key not found")
@@ -97,7 +124,7 @@ func (c *CryptoSuite) GetKey(ski []byte) (k core.Key, err error) {
 }
 
 // Hash returns hash og some data using CryptoSuite hash
-func (c *CryptoSuite) Hash(msg []byte, opts core.HashOpts) (hash []byte, err error) {
+func (c *CryptoSuite) Hash(msg []byte, opts fabcore.HashOpts) (hash []byte, err error) {
 	h, err := c.GetHash(opts)
 	if err != nil {
 		return nil, err
@@ -110,16 +137,44 @@ func (c *CryptoSuite) Hash(msg []byte, opts core.HashOpts) (hash []byte, err err
 }
 
 // GetHash returns CryptoSuite hash
-func (c *CryptoSuite) GetHash(opts core.HashOpts) (h hash.Hash, err error) {
+func (c *CryptoSuite) GetHash(opts fabcore.HashOpts) (h hash.Hash, err error) {
 	return sha256.New(), nil
 }
 
 // Sign uses Vault to sign the digest
-func (c *CryptoSuite) Sign(k core.Key, digest []byte, opts core.SignerOpts) (signature []byte, err error) {
+func (c *CryptoSuite) Sign(k fabcore.Key, digest []byte, opts fabcore.SignerOpts) (signature []byte, err error) {
 	switch k.(type) {
-	case *identity.Key:
-		Key := k.(*identity.Key)
-		sig, err := c.vaultTransit.Sign(Key.ID, digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: false})
+	case core.Key:
+		Key := k.(core.Key)
+
+		skiBytes := Key.SKI()
+		ski := hex.EncodeToString(skiBytes)
+		kid, err := c.keyIdFromSKI(ski)
+		if err != nil {
+			return nil, err
+		}
+
+		sig, err := c.vault.Transit().Sign(string(kid), digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
+		if err != nil {
+			return nil, err
+		}
+		sigLowS, err := utils.SignatureToLowS(Key.PubKey, sig)
+		if err != nil {
+			return nil, err
+		}
+		signature = sigLowS
+		return signature, err
+	case *core.Key:
+		Key := k.(*core.Key)
+
+		skiBytes := Key.SKI()
+		ski := hex.EncodeToString(skiBytes)
+		kid, err := c.keyIdFromSKI(ski)
+		if err != nil {
+			return nil, err
+		}
+
+		sig, err := c.vault.Transit().Sign(string(kid), digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
 		if err != nil {
 			return nil, err
 		}
@@ -135,10 +190,10 @@ func (c *CryptoSuite) Sign(k core.Key, digest []byte, opts core.SignerOpts) (sig
 }
 
 // Verify verifies if signature is created using provided key
-func (c *CryptoSuite) Verify(k core.Key, signature, digest []byte, opts core.SignerOpts) (valid bool, err error) {
+func (c *CryptoSuite) Verify(k fabcore.Key, signature, digest []byte, opts fabcore.SignerOpts) (valid bool, err error) {
 	switch k.(type) {
-	case *identity.Key:
-		ecdsaPubKey := k.(*identity.Key)
+	case *core.Key:
+		ecdsaPubKey := k.(*core.Key)
 		r, s, err := utils.UnmarshalECDSASignature(signature)
 		if err != nil {
 			return false, fmt.Errorf("failed unmashalling signature [%s]", err)
@@ -148,3 +203,17 @@ func (c *CryptoSuite) Verify(k core.Key, signature, digest []byte, opts core.Sig
 		return false, errors.New("invalid key type")
 	}
 }
+
+func generateKeyId() string {
+	keyId := uuid.New()
+	return keyId.String()
+}
+
+func (c *CryptoSuite) storeKeyId(keyId, ski string) error {
+	return c.db.Put(ski, []byte(keyId))
+}
+
+func (c *CryptoSuite) keyIdFromSKI(ski string) ([]byte, error) {
+	return c.db.Get(ski)
+}
+

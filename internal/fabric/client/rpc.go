@@ -17,41 +17,59 @@
 package client
 
 import (
+	"fmt"
+
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
+	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 	log "github.com/sirupsen/logrus"
 
+	vault_cs "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
 	vault_msp "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/msp"
-
 )
 
-//
 // Instantiate an RPC client to interact with a Fabric network. based on the client configuration
 // on gateway usage, it creates different types of client under the cover:
 // - "useGatewayClient: true": returned RPCClient uses the client-side Gateway
 // - "useGatewayClient: false": returned RPCClient uses a static network map described by the Connection Profile
 // - "useGatewayServer: true": for Fabric 2.4 node only, the returned RPCClient utilizes the server-side gateway service
-//
 func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClient, error) {
 	configProvider := config.FromFile(c.ConfigPath)
-
 
 	// userStore, err := newUserstore(configProvider)
 	// if err != nil {
 	// 	return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	// }
+	db := kvstore.NewLDBKeyValueStore("/home/hossein/workspace/oneof/firefly-fabconnect/db1")
+	if err := db.Init(); err != nil {
+		return nil, nil, errors.Errorf("Failed to initialize db: %s", err)
+	}
+	keyid, _ := db.Get("86d85d9a8718cf24f93030a0f0a747e818ed86f4b360351bb6065d59e4f7034f")
+	fmt.Printf("keyid: %s\n", keyid)
+
 	userStore, err := vault_msp.NewCertVaultUserStore("Org1MSP/certs")
 	if err != nil {
 		return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	}
-	identityClient, err := newIdentityClient(configProvider, userStore)
+	identityClient, err := newIdentityClient(configProvider, userStore, db)
 	if err != nil {
 		return nil, nil, err
 	}
-	sdk, err := fabsdk.New(configProvider)
+
+	cs, err := vault_cs.NewCryptoSuite(&vault_cs.CryptoSuiteVaultConfig{
+		VaultConfig: vault.WithConfigFromEnv(),
+		DB:          db,
+	})
+	if err != nil {
+		return nil, nil, errors.Errorf("Failed to create a new CryptoSuite instance. %s", err)
+	}
+	mspfactory := vault_msp.NewVaultMSPFactory(userStore, cs, db)
+
+	sdk, err := fabsdk.New(configProvider, fabsdk.WithMSPPkg(mspfactory), fabsdk.WithCorePkg(vault_cs.NewProviderFactory(db)))
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to initialize a new SDK instance. %s", err)
 	}

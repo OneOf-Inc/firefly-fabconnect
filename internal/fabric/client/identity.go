@@ -36,7 +36,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 
-	vault_cs "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/cryptosuite"
+	vault_cs "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
 	vault_msp "github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/msp"
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
@@ -57,16 +57,12 @@ type idClientWrapper struct {
 	listeners      []SignerUpdateListener
 }
 
-func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
+func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, db kvstore.KVStore) (*idClientWrapper, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 
 	// cs, err := sw.GetSuiteByConfig(cryptoConfig)
 
-	db := kvstore.NewLDBKeyValueStore("/home/hossein/workspace/oneof/firefly-fabconnect/db")
-	if err := db.Init(); err != nil {
-		return nil, errors.Errorf("Failed to initialize db: %s", err)
-	}
 	cs, err := vault_cs.NewCryptoSuite(&vault_cs.CryptoSuiteVaultConfig{
 		VaultConfig:   vault.WithConfigFromEnv(),
 		DB:            db,

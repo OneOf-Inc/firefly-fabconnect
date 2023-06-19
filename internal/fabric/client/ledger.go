@@ -128,7 +128,16 @@ func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerC
 	}
 	ledgerClient = ledgerClientsForSigner[channelId]
 	if ledgerClient == nil {
-		channelProvider := l.sdk.ChannelContext(channelId, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithUser(signer))
+		// si, err := msp.WithVaultConfig(vault.WithConfigFromEnv())
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// si.NewSigningIdentity("Org1MSP", signer, )
+		id, err := l.idClient.GetSigningIdentity(signer)
+		if err != nil {
+			return nil, err
+		}
+		channelProvider := l.sdk.ChannelContext(channelId, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithIdentity(id))
 		ledgerClient, err = l.ledgerClientCreator(channelProvider)
 		if err != nil {
 			return nil, err

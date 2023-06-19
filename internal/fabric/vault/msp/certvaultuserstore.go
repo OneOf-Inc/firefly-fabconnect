@@ -34,7 +34,7 @@ func NewCertVaultUserStore(path string) (*CertVaultUserStore, error) {
 }
 
 // Load returns the User stored in the store for a key.
-func (s *CertVaultUserStore) Load(key msp.IdentityIdentifier) (*msp.UserData, error) {
+func (s CertVaultUserStore) Load(key msp.IdentityIdentifier) (*msp.UserData, error) {
 	cert, err := s.store.Load(storeKeyFromUserIdentifier(key))
 	if err != nil {
 		return nil, fmt.Errorf("user load failed: %v", err)
@@ -54,13 +54,13 @@ func (s *CertVaultUserStore) Load(key msp.IdentityIdentifier) (*msp.UserData, er
 }
 
 // Store stores a User into store
-func (s *CertVaultUserStore) Store(user *msp.UserData) error {
+func (s CertVaultUserStore) Store(user *msp.UserData) error {
 	key := storeKeyFromUserIdentifier(msp.IdentityIdentifier{ID: user.ID, MSPID: user.MSPID})
 	return s.store.Store(key, user.EnrollmentCertificate)
 }
 
 // Delete deletes a User from store
-func (s *CertVaultUserStore) Delete(key msp.IdentityIdentifier) error {
+func (s CertVaultUserStore) Delete(key msp.IdentityIdentifier) error {
 	return fmt.Errorf("not implemented")
 }
 

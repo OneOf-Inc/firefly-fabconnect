@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hashicorp/vault/api"
 	"github.com/google/tink/go/kwp/subtle"
+	"github.com/hashicorp/vault/api"
 )
 
 type TransitConfig struct {
@@ -29,13 +29,13 @@ type SignOpts struct {
 	Hash       string
 }
 
-func DefaultTranistConfig() (*TransitConfig) {
+func DefaultTranistConfig() *TransitConfig {
 	return &TransitConfig{
 		MountPoint: "transit",
 	}
 }
 
-func WithTransitConfigFromEnv() (*TransitConfig) {
+func WithTransitConfigFromEnv() *TransitConfig {
 	return &TransitConfig{
 		MountPoint: os.Getenv("VAULT_TRANSIT_MOUNT_POINT"),
 	}
@@ -87,12 +87,12 @@ func (t *Transit) GetKey(keyName string) (string, error) {
 	if s == nil {
 		return "", fmt.Errorf("no key was returned")
 	}
-	
+
 	keys, ok := s.Data["keys"].(map[string]interface{})
 	if !ok {
 		return "", fmt.Errorf("failed to parse keys")
 	}
-	
+
 	k := keys["1"].(map[string]interface{})
 	pk, ok := k["public_key"].(string)
 	if !ok {

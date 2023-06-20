@@ -10,19 +10,24 @@ import (
 )
 
 type ProviderFactory struct {
-	db kvstore.KVStore
+	vault *vault.Vault
+	db    kvstore.KVStore
+	path  string
 }
 
-func NewProviderFactory(db kvstore.KVStore) *ProviderFactory {
+func NewProviderFactory(vault *vault.Vault, db kvstore.KVStore, path string) *ProviderFactory {
 	return &ProviderFactory{
-		db: db,
+		vault: vault,
+		db:    db,
+		path:  path,
 	}
 }
 
 func (p *ProviderFactory) CreateCryptoSuiteProvider(config fabcore.CryptoSuiteConfig) (fabcore.CryptoSuite, error) {
 	return NewCryptoSuite(&CryptoSuiteVaultConfig{
-		VaultConfig: vault.WithConfigFromEnv(),
-		DB:          p.db,
+		Vault: p.vault,
+		DB:    p.db,
+		Path:  p.path,
 	})
 }
 

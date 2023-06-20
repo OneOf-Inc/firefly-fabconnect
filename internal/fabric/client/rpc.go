@@ -17,8 +17,6 @@
 package client
 
 import (
-	"fmt"
-
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
@@ -44,32 +42,35 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 	// if err != nil {
 	// 	return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	// }
+	certStorePath := "/Org1MSP/certs"
+	vault, err := vault.New(vault.WithConfigFromEnv())
+	if err != nil {
+		return nil, nil, err
+	}
 	db := kvstore.NewLDBKeyValueStore("/home/hossein/workspace/oneof/firefly-fabconnect/db1")
 	if err := db.Init(); err != nil {
 		return nil, nil, errors.Errorf("Failed to initialize db: %s", err)
 	}
-	keyid, _ := db.Get("86d85d9a8718cf24f93030a0f0a747e818ed86f4b360351bb6065d59e4f7034f")
-	fmt.Printf("keyid: %s\n", keyid)
-
-	userStore, err := vault_msp.NewCertVaultUserStore("Org1MSP/certs")
+	userStore, err := vault_msp.NewCertVaultUserStore(certStorePath)
 	if err != nil {
 		return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	}
-	identityClient, err := newIdentityClient(configProvider, userStore, db)
+	identityClient, err := newIdentityClient(configProvider, userStore, vault, db, certStorePath)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	cs, err := vault_cs.NewCryptoSuite(&vault_cs.CryptoSuiteVaultConfig{
-		VaultConfig: vault.WithConfigFromEnv(),
-		DB:          db,
+		Vault: vault,
+		DB:    db,
+		Path:  certStorePath,
 	})
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to create a new CryptoSuite instance. %s", err)
 	}
 	mspfactory := vault_msp.NewVaultMSPFactory(userStore, cs, db)
 
-	sdk, err := fabsdk.New(configProvider, fabsdk.WithMSPPkg(mspfactory), fabsdk.WithCorePkg(vault_cs.NewProviderFactory(db)))
+	sdk, err := fabsdk.New(configProvider, fabsdk.WithMSPPkg(mspfactory), fabsdk.WithCorePkg(vault_cs.NewProviderFactory(vault, db, certStorePath)))
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to initialize a new SDK instance. %s", err)
 	}

@@ -20,15 +20,15 @@ import (
 
 type CryptoSuite struct {
 	vault *vault.Vault
-
-	db kvstore.KVStore
-
-	keys map[string]fabcore.Key
+	db    kvstore.KVStore
+	path  string
+	keys  map[string]fabcore.Key
 }
 
 type CryptoSuiteVaultConfig struct {
-	VaultConfig   *vault.Config
-	DB            kvstore.KVStore
+	Vault *vault.Vault
+	DB    kvstore.KVStore
+	Path  string
 }
 
 const (
@@ -36,14 +36,10 @@ const (
 )
 
 func NewCryptoSuite(cfg *CryptoSuiteVaultConfig) (CryptoSuite, error) {
-	v, err := vault.New(cfg.VaultConfig)
-	if err != nil {
-		return CryptoSuite{}, fmt.Errorf("failed to create vault client: %v", err)
-	}
-
 	cs := CryptoSuite{
-		vault: v,
+		vault: cfg.Vault,
 		db:    cfg.DB,
+		path:  cfg.Path,
 		keys:  make(map[string]fabcore.Key),
 	}
 
@@ -98,7 +94,7 @@ func (c CryptoSuite) KeyImport(raw interface{}, opts fabcore.KeyImportOpts) (k f
 			return nil, errors.New("invalid key type, it must be ECDSA Public Key")
 		}
 
-		err = c.vault.Secret().WriteSecret(fmt.Sprintf("certs/%s", cert.Subject.CommonName), map[string]interface{}{
+		err = c.vault.Secret().WriteSecret(fmt.Sprintf("%s/%s", c.path, cert.Subject.CommonName), map[string]interface{}{
 			"cert": string(cert.Raw),
 		})
 		if err != nil {
@@ -218,4 +214,3 @@ func (c CryptoSuite) storeKeyId(keyId, ski string) error {
 func (c CryptoSuite) keyIdFromSKI(ski string) ([]byte, error) {
 	return c.db.Get(ski)
 }
-

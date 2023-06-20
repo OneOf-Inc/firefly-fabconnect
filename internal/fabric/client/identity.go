@@ -57,15 +57,16 @@ type idClientWrapper struct {
 	listeners      []SignerUpdateListener
 }
 
-func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, db kvstore.KVStore) (*idClientWrapper, error) {
+func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, vault *vault.Vault, db kvstore.KVStore, path string) (*idClientWrapper, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 
 	// cs, err := sw.GetSuiteByConfig(cryptoConfig)
 
 	cs, err := vault_cs.NewCryptoSuite(&vault_cs.CryptoSuiteVaultConfig{
-		VaultConfig:   vault.WithConfigFromEnv(),
-		DB:            db,
+		Vault: vault,
+		DB:    db,
+		Path:  path,
 	})
 	if err != nil {
 		return nil, errors.Errorf("Failed to get suite by config: %s", err)
@@ -85,11 +86,7 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 	}
 	// mgr, err := mspImpl.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig)
 
-	v, err := vault.New(vault.WithConfigFromEnv())
-	if err != nil {
-		return nil, errors.Errorf("Failed to create vault client: %s", err)
-	}
-	mgr, err := vault_msp.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig, v, db)
+	mgr, err := vault_msp.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig, vault, db)
 	if err != nil {
 		return nil, errors.Errorf("Identity manager creation failed. %s", err)
 	}

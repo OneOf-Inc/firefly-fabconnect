@@ -17,8 +17,14 @@
 package client
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
+	"github.com/hyperledger/fabric-sdk-go/pkg/core/config/lookup"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	"github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
@@ -42,12 +48,16 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 	// if err != nil {
 	// 	return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	// }
-	certStorePath := "/Org1MSP/certs"
+	mspId, err := getMspIdFromConfig(configProvider)
+	if err != nil {
+		return nil, nil, err
+	}
+	certStorePath := fmt.Sprintf("%s/certs", mspId)
 	vault, err := vault.New(vault.WithConfigFromEnv())
 	if err != nil {
 		return nil, nil, err
 	}
-	db := kvstore.NewLDBKeyValueStore("/home/hossein/workspace/oneof/firefly-fabconnect/db1")
+	db := kvstore.NewLDBKeyValueStore(os.Getenv("VAULT_DB_PATH"))
 	if err := db.Init(); err != nil {
 		return nil, nil, errors.Errorf("Failed to initialize db: %s", err)
 	}
@@ -91,4 +101,20 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 		log.Info("Using client-side gateway mode of the RPC client")
 	}
 	return rpcClient, identityClient, nil
+}
+
+func getMspIdFromConfig(configProvider core.ConfigProvider) (string, error) {
+	configBackend, err := configProvider()
+	if err != nil {
+		return "", errors.Errorf("Failed to load config: %s", err)
+	}
+	l := lookup.New(configBackend...)
+	var client msp.ClientConfig
+	l.UnmarshalKey("client", &client)
+	organization := client.Organization
+	var orgs map[string]map[string]interface{}
+	l.UnmarshalKey("organizations", &orgs)
+	mspId := orgs[organization]["mspid"]
+
+	return mspId.(string), nil
 }

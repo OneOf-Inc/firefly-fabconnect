@@ -42,6 +42,7 @@ func WithTransitConfigFromEnv() *TransitConfig {
 }
 
 func (v *Vault) Transit() *Transit {
+	v.login()
 	return &Transit{c: v.client, cfg: v.transitCfg}
 }
 

@@ -14,6 +14,9 @@ type Vault struct {
 
 	transitCfg *TransitConfig
 	secretsCfg *SecretsConfig
+
+	RoleID   string
+	SecretID string
 }
 
 type Config struct {
@@ -32,24 +35,19 @@ func New(cfg *Config) (*Vault, error) {
 		return nil, err
 	}
 
-	appRoleAuth, err := auth.NewAppRoleAuth(cfg.RoleID, &auth.SecretID{FromString: cfg.SecretID})
-	if err != nil {
-		return nil, fmt.Errorf("unable to initialize AppRole auth method: %w", err)
-	}
-
-	authInfo, err := client.Auth().Login(context.Background(), appRoleAuth)
-	if err != nil {
-		return nil, fmt.Errorf("unable to login to AppRole auth method: %w", err)
-	}
-	if authInfo == nil {
-		return nil, fmt.Errorf("no auth info was returned after login")
-	}
-
-	return &Vault{
+	vault := &Vault{
 		client:     client,
 		transitCfg: cfg.TransitConfig,
 		secretsCfg: cfg.SecretsConfig,
-	}, nil
+		RoleID:     cfg.RoleID,
+		SecretID:   cfg.SecretID,
+	}
+
+	if err = vault.login(); err != nil {
+		return nil, err
+	}
+
+	return vault, nil
 }
 
 func WithConfigFromEnv() *Config {
@@ -61,4 +59,21 @@ func WithConfigFromEnv() *Config {
 		SecretsConfig: WithSecretsConfigFromEnv(),
 	}
 	return cfg
+}
+
+func (v *Vault) login() error {
+	appRoleAuth, err := auth.NewAppRoleAuth(v.RoleID, &auth.SecretID{FromString: v.SecretID})
+	if err != nil {
+		return fmt.Errorf("unable to initialize AppRole auth method: %w", err)
+	}
+
+	authInfo, err := v.client.Auth().Login(context.Background(), appRoleAuth)
+	if err != nil {
+		return fmt.Errorf("unable to login to AppRole auth method: %w", err)
+	}
+	if authInfo == nil {
+		return fmt.Errorf("no auth info was returned after login")
+	}
+
+	return nil
 }

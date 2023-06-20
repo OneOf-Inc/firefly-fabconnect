@@ -28,6 +28,7 @@ func WithSecretsConfigFromEnv() *SecretsConfig {
 }
 
 func (v *Vault) Secret() *Secret {
+	v.login()
 	return &Secret{c: v.client, cfg: v.secretsCfg}
 }
 

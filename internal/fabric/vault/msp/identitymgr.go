@@ -30,6 +30,7 @@ type IdentityManager struct {
 	embeddedUsers   map[string]fab.CertKeyPair
 	mspPrivKeyStore fabcore.KVStore
 	mspCertStore    fabcore.KVStore
+	mspSecretStore  fabcore.KVStore
 	userStore       msp.UserStore
 }
 
@@ -55,6 +56,11 @@ func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fab
 		return nil, fmt.Errorf("creating a cert store failed: %v", err)
 	}
 
+	mspSecretStore, err := NewVaultSecretsStore(orgConfig.MSPID, vault)
+	if err != nil {
+		return nil, fmt.Errorf("creating a cert store failed: %v", err)
+	}
+
 	mgr := &IdentityManager{
 		orgName:         orgName,
 		orgMSPID:        orgConfig.MSPID,
@@ -62,6 +68,7 @@ func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fab
 		cryptoSuite:     cryptoSuite,
 		mspPrivKeyStore: mspPrivKeyStore,
 		mspCertStore:    mspCertStore,
+		mspSecretStore:  mspSecretStore,
 		embeddedUsers:   orgConfig.Users,
 		userStore:       userStore,
 	}
@@ -158,6 +165,18 @@ func (mgr *IdentityManager) GetUser(username string) (*User, error) {
 
 func (*IdentityManager) NewUser(userData *msp.UserData) (*User, error) {
 	return nil, nil
+}
+
+func (mgr *IdentityManager) StoreSecret(username string, secret []byte) error {
+	return mgr.mspSecretStore.Store(username, secret)
+}
+
+func (mgr *IdentityManager) GetSecret(username string) ([]byte, error) {
+	secret, err := mgr.mspSecretStore.Load(username)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(secret.(string)), nil
 }
 
 func skiFromCert(certBytes []byte) (string, error) {

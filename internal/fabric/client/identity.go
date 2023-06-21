@@ -164,9 +164,13 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 		return nil, restutil.NewRestError(err.Error())
 	}
 
+	if err = w.identityMgr.(*vault_msp.IdentityManager).StoreSecret(regreq.Name, []byte(secret)); err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to store secret for user %s: %s", regreq.Name, err), 500)
+	}
+
 	result := identity.RegisterResponse{
 		Name:   rr.Name,
-		Secret: secret,
+		Secret: "***",
 	}
 	return &result, nil
 }
@@ -181,13 +185,18 @@ func (w *idClientWrapper) Modify(res http.ResponseWriter, req *http.Request, par
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
 	}
 
+	secret, err := w.identityMgr.(*vault_msp.IdentityManager).GetSecret(username)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get secret for user %s: %s", username, err), 500)
+	}
+
 	rr := &mspApi.IdentityRequest{
 		ID:             username,
 		Type:           regreq.Type,
 		MaxEnrollments: regreq.MaxEnrollments,
 		Affiliation:    regreq.Affiliation,
 		CAName:         regreq.CAName,
-		Secret:         regreq.Secret,
+		Secret:         string(secret),
 	}
 	if regreq.Attributes != nil {
 		rr.Attributes = []mspApi.Attribute{}
@@ -217,13 +226,18 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
 	}
-	if enreq.Secret == "" {
-		return nil, restutil.NewRestError(`missing required parameter "secret"`, 400)
+	// if enreq.Secret == "" {
+	// 	return nil, restutil.NewRestError(`missing required parameter "secret"`, 400)
+	// }
+
+	secret, err := w.identityMgr.(*vault_msp.IdentityManager).GetSecret(username)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get secret for user %s: %s", username, err), 500)
 	}
 
 	input := mspApi.EnrollmentRequest{
 		Name:    username,
-		Secret:  enreq.Secret,
+		Secret:  string(secret),
 		CAName:  enreq.CAName,
 		Profile: enreq.Profile,
 	}

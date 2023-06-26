@@ -1,0 +1,117 @@
+on:
+  workflow_call:
+    inputs:
+      AWS_ENVIRONMENT:
+        required: true
+        type: string
+      AWS_ACCOUNT_ID:
+        required: true
+        type: string
+      SERVICE_NAME:
+        required: true
+        type: string
+      HELM_DIR:
+        required: true
+        type: string
+      APP_VERSION:
+        required: true
+        type: string
+      NAMESPACE:
+        required: true
+        type: string
+      CLUSTER:
+        required: true
+        type: string
+      ECR_REPO:
+        required: true
+        type: string
+    secrets:
+      AUTOMATION_AWS_ACCESS_KEY_ID:
+        required: true
+      AUTOMATION_AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      AUTOMATION_GITHUB_PAT:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.AWS_ACCOUNT_ID }}:role/${{ inputs.AWS_ENVIRONMENT }}.automation.role
+          aws-access-key-id: ${{ secrets.AUTOMATION_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOMATION_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{secrets.AWS_REGION}}
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: API Build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile
+          tags: ${{ inputs.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ inputs.ECR_REPO }}:${{ inputs.APP_VERSION }}-${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies on the CI runner
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install git-crypt zip curl -y
+          curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
+          sudo apt-get install apt-transport-https --yes
+          echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install helm
+          helm repo add codecentric https://codecentric.github.io/helm-charts
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Checkout Helm Charts Repo Package
+        uses: actions/checkout@v3
+        with:
+          repository: OneOf-Inc/oneof-k8s
+          ref: "main"
+          path: helm
+          token: ${{ secrets.AUTOMATION_GITHUB_PAT }}
+          clean: false
+
+      - name: Setup Vars
+        run: |
+          mkdir ./charts/templates
+          cp -r ./helm/helm/templates/* ./charts/templates
+          cd ./charts && sed -ie "s~@@BACKEND_NAME@@~${{ inputs.SERVICE_NAME }}~g" Chart.yaml
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.AWS_ACCOUNT_ID }}:role/${{ inputs.AWS_ENVIRONMENT }}.automation.role
+          aws-access-key-id: ${{ secrets.AUTOMATION_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOMATION_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{secrets.AWS_REGION}}
+          role-duration-seconds: 3600
+
+      - name: Login to K8S Cluster
+        run: aws eks --region ${{ secrets.AWS_REGION }} update-kubeconfig --name ${{ inputs.CLUSTER }}
+
+      - name: Deploy Secrets
+        run: helm upgrade oneof-${{ inputs.SERVICE_NAME }}-secrets ${{ inputs.HELM_DIR }}/ -n ${{ inputs.NAMESPACE }} --install --wait --set image.tag=${{ inputs.APP_VERSION }}-${{ github.sha }} --values=${{ inputs.HELM_DIR }}/values/${{ inputs.AWS_ENVIRONMENT }}.yaml
+
+      - name: Deploy to Dev
+        run: helm upgrade oneof-${{ inputs.SERVICE_NAME }} ${{ inputs.HELM_DIR }}/ -n ${{ inputs.NAMESPACE }} --install --wait --set image.tag=${{ inputs.APP_VERSION }}-${{ github.sha }} --values=${{ inputs.HELM_DIR }}/values/${{ inputs.AWS_ENVIRONMENT }}.yaml

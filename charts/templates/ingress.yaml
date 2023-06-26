@@ -1,0 +1,50 @@
+{{- range $service := .Values.ingresses }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $service.name }}
+  labels:
+    app.kubernetes.io/name: {{ $service.name }}
+    {{- include "deployment.labels" $ | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/load-balancer-name: {{ $service.name }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/healthcheck-protocol: "HTTP"
+    alb.ingress.kubernetes.io/healthcheck-port: "traffic-port"
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $service.healthCheckPath }}
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "60"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "30"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2" 
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    {{- if $service.annotations }}
+    {{- toYaml $service.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  tls:
+    - hosts:
+      - {{ $service.domain }}
+  rules:
+  {{- range $rule := $service.rules }}
+    - {{- if $rule.host }}
+      host: {{ $rule.host }}
+      {{- end }}
+      http:
+        paths:
+          {{- range $path := $rule.paths }}
+            - path: {{ $path.path }}
+              pathType: Prefix
+              backend:
+                service:
+                  name: {{ $path.name }}
+                  port:
+                    {{- if $path.servicePort }}
+                    number: {{ $path.servicePort }}
+                    {{- end }}
+                    {{- if $path.serviceName }}
+                    name: {{ $path.serviceName }}
+                    {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

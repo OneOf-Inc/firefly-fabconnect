@@ -1,0 +1,16 @@
+---
+serviceAccount:
+  annotations:
+    "eks.amazonaws.com/role-arn": "arn:aws:iam::989259452539:role/wmg-fabconnect-yfnxbsp6m4qv"
+
+externalSecrets:
+  secret1:
+    name: fabconnect
+    data: []
+    dataFrom:
+      - wmg-fabconnect-yfnxbsp6m4qv
+
+image:
+  repository: "989259452539.dkr.ecr.us-west-2.amazonaws.com/wmg-fabconnect-yfnxbsp6m4qv"
+  pullPolicy: Always
+  tag: "latest"

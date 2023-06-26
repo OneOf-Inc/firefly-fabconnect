@@ -1,0 +1,71 @@
+---
+replicaCount: 1
+
+environmentVariables: {}
+
+nameOverride: fabconnect
+
+fullnameOverride: fabconnect
+
+externalSecrets: {}
+  
+
+serviceAccount: {}
+
+nodeSelector:
+  node_type: default
+
+aws:
+  region: us-west-2
+
+image: {}
+
+services:
+  service1:
+    name: fabconnect
+    type: NodePort
+    protocol: TCP
+    servicePort: 5102
+    servicePortName: fabconnect
+    containerPort: 5102
+
+ingresses: {}
+
+deployments:
+  deployment1:
+    name: fabconnect
+    strategy:
+      type: RollingUpdate
+      maxSurge: 1
+      maxUnavailable: 50%
+    autoscaling:
+      enabled: false
+    containerPortEnabled: true
+    containerPort: 5102
+    livenessProbeEnabled: true
+    livenessProbe:
+      healthCheckPath: /status
+    nodeSelector:
+      node_type: worker
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 256Mi
+    replicaCount: 1
+    secretsRef:
+      - "fabconnect"
+    command: 
+      - sh
+      - ./bin/start.sh
+    volumeMounts: |
+      - name: fabconnect
+        readOnly: true
+        mountPath: /var/hyperledger/ca_config
+    volumes: |
+      - name: fabconnect
+        configMap:
+          name: fabconnect
+          defaultMode: 420

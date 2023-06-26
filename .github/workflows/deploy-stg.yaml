@@ -1,0 +1,20 @@
+name: Deploy Stg
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - vault-wallet
+jobs:
+  deploy-warner:
+    name: Deploy Warner Enterprise
+    uses: ./.github/workflows/build-and-deploy.yaml
+    with:
+      AWS_ACCOUNT_ID: 989259452539
+      AWS_ENVIRONMENT: stg
+      SERVICE_NAME: fabconnect
+      APP_VERSION: 0.0.1
+      HELM_DIR: charts
+      NAMESPACE: fabric
+      CLUSTER: wmg-stg-yfnxbsp6m4qv
+      ECR_REPO: wmg-fabconnect-yfnxbsp6m4qv
+    secrets: inherit

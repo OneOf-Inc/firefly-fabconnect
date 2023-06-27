@@ -13,7 +13,7 @@ externalSecrets: {}
 serviceAccount: {}
 
 nodeSelector:
-  node_type: default
+  eks.amazonaws.com/nodegroup: fabric
 
 aws:
   region: us-west-2
@@ -46,7 +46,7 @@ deployments:
     livenessProbe:
       healthCheckPath: /status
     nodeSelector:
-      node_type: worker
+      eks.amazonaws.com/nodegroup: fabric
     resources:
       limits:
         cpu: 1000m
@@ -57,15 +57,63 @@ deployments:
     replicaCount: 1
     secretsRef:
       - "fabconnect"
-    command: 
-      - sh
-      - ./bin/start.sh
-    volumeMounts: |
+    command: [./fabconnect, -f, /fabconnect/config.yaml]
+    volumeMounts:
       - name: fabconnect
         readOnly: true
-        mountPath: /var/hyperledger/ca_config
-    volumes: |
+        mountPath: /fabconnect/config.yaml
+        subPath: config.yaml
+      - name: fabconnect
+        readOnly: true
+        mountPath: /fabconnect/ccp.yaml
+        subPath: ccp.yaml
+      - name: receipts-pvc
+        mountPath: /fabconnect/receipts
+      - name: events-pvc
+        mountPath: /fabconnect/events  
+      - name: firefly-msp
+        mountPath: /etc/firefly/msp
+      - name: vault-ca
+        mountPath: /etc/ssl/certs/vault.ca
+        subPath: vault.ca
+    volumes:
       - name: fabconnect
         configMap:
           name: fabconnect
           defaultMode: 420
+      - name: receipts-pvc
+        persistentVolumeClaim:
+          claimName: fabconnect-receipts
+      - name: events-pvc
+        persistentVolumeClaim:
+          claimName: fabconnect-events
+      - name: firefly-msp
+        emptyDir: {}
+      - name: vault-ca
+        configMap:
+          name: vault-ca.root
+          defaultMode: 420
+
+persistentVolumes:
+  pvc1:
+    name: fabconnect-receipts
+    storage: 50Gi
+    volumeID: vol-fab-receipts-123
+    namespace: fabric
+    claim:
+      labels: {}
+      annotations: {}
+    volume:
+      labels: {}
+      annotations: {}
+  pvc2:
+    name: fabconnect-events
+    storage: 50Gi
+    volumeID: vol-fab-events-123
+    namespace: fabric
+    claim:
+      labels: {}
+      annotations: {}
+    volume:
+      labels: {}
+      annotations: {}

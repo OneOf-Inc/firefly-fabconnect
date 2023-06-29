@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"hash"
@@ -107,7 +108,20 @@ func (c CryptoSuite) KeyImport(raw interface{}, opts fabcore.KeyImportOpts) (k f
 func (c CryptoSuite) GetKey(ski []byte) (k fabcore.Key, err error) {
 	key, ok := c.keys[string(ski)]
 	if !ok {
-		return nil, errors.New("key not found")
+		ks, err := c.vault.Transit().GetKey(string(ski))
+		if err != nil {
+			return nil, errors.New("key not found")
+		}
+
+		block, _ := pem.Decode([]byte(ks))
+		if block == nil {
+			return nil, fmt.Errorf("failed to decode PEM block")
+		}
+		pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse public key: %v", err)
+		}
+		key = &Key{PubKey: pubKey.(*ecdsa.PublicKey)}
 	}
 	return key, nil
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"testing"
 
@@ -14,8 +15,8 @@ import (
 func test_init() (*Vault, error) {
 	var cfg = &Config{
 		Address:  "http://localhost:8200",
-		RoleID:   "84860544-65ea-5829-5636-c1b1e2153cdc",
-		SecretID: "349e03c3-20e9-d426-f452-6e2c2d7162b5",
+		RoleID:   "bd8f5d94-cf6a-2995-4510-722c1209e247",
+		SecretID: "5b671f5b-d6f5-6b37-093b-289aa92d22aa",
 		TransitConfig: &TransitConfig{
 			MountPoint: "transit",
 		},
@@ -51,6 +52,19 @@ func Test_Transit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// convert PEM key to ecdsa.PublicKey
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		t.Fatal("Failed to decode PEM block")
+	}
+
+	// Parse the decoded PEM block into a public key
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("Key: %v\n", pubKey)
+
 	t.Logf("Key: %v\n", key)
 
 	data := []byte("test")
@@ -66,7 +80,6 @@ func Test_Transit(t *testing.T) {
 	t.Logf("Signature: %x\n", s)
 
 	fmt.Printf("Key: %v\n", keyName.String())
-
 
 	vrf, err := v.Transit().Verify(keyName.String(), data, s, signOpts)
 	if err != nil {

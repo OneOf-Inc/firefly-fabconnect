@@ -17,7 +17,10 @@
 package client
 
 import (
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 
@@ -306,11 +309,29 @@ func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, par
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
 	}
 
+	id, err := w.identityMgr.GetSigningIdentity(username)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", username, err), 500)
+	}
+	cert := id.EnrollmentCertificate()
+	block, _ := pem.Decode(cert)
+	if block == nil {
+		log.Fatal("Failed to decode PEM block")
+	}
+	c, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to parse certificate for user %s: %s", username, err), 500)
+	}
+	aki := hex.EncodeToString(c.AuthorityKeyId)
+	serialNumber := hex.EncodeToString(c.SerialNumber.Bytes())
+
 	input := mspApi.RevocationRequest{
 		Name:   username,
 		CAName: enreq.CAName,
 		Reason: enreq.Reason,
 		GenCRL: enreq.GenCRL,
+		Serial: serialNumber,
+		AKI:    aki,
 	}
 
 	response, err := w.caClient.Revoke(&input)

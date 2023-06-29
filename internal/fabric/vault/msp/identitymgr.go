@@ -16,7 +16,6 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config/cryptoutil"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
-	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 
 	"github.com/pkg/errors"
@@ -34,7 +33,7 @@ type IdentityManager struct {
 	userStore       msp.UserStore
 }
 
-func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fabcore.CryptoSuite, endpointConfig fab.EndpointConfig, vault *vault.Vault, db kvstore.KVStore) (*IdentityManager, error) {
+func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fabcore.CryptoSuite, endpointConfig fab.EndpointConfig, vault *vault.Vault) (*IdentityManager, error) {
 	netConfig := endpointConfig.NetworkConfig()
 	// viper keys are case insensitive
 	orgConfig, ok := netConfig.Organizations[strings.ToLower(orgName)]
@@ -46,7 +45,7 @@ func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fab
 		return nil, fmt.Errorf("Either a cryptopath or an embedded list of users is required")
 	}
 
-	mspPrivKeyStore, err := NewVaultKeyStore(orgConfig.MSPID, vault, db)
+	mspPrivKeyStore, err := NewVaultKeyStore(orgConfig.MSPID, vault)
 	if err != nil {
 		return nil, fmt.Errorf("creating a key store failed: %v", err)
 	}

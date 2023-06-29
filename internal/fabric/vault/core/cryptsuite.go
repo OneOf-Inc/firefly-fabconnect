@@ -2,10 +2,11 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"hash"
@@ -27,7 +28,6 @@ type CryptoSuite struct {
 
 type CryptoSuiteVaultConfig struct {
 	Vault *vault.Vault
-	DB    kvstore.KVStore
 	Path  string
 }
 
@@ -38,7 +38,6 @@ const (
 func NewCryptoSuite(cfg *CryptoSuiteVaultConfig) (CryptoSuite, error) {
 	cs := CryptoSuite{
 		vault: cfg.Vault,
-		db:    cfg.DB,
 		path:  cfg.Path,
 		keys:  make(map[string]fabcore.Key),
 	}
@@ -47,37 +46,29 @@ func NewCryptoSuite(cfg *CryptoSuiteVaultConfig) (CryptoSuite, error) {
 }
 
 func (c CryptoSuite) KeyGen(opts fabcore.KeyGenOpts) (k fabcore.Key, err error) {
-	keyId := generateKeyId()
-
-	err = c.vault.Transit().CreateKey(keyId, DefaultKeyType)
+	// generate ecdsa key
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create key: %v", err)
+		return nil, fmt.Errorf("failed to generate key: %v", err)
 	}
+	pubKey := &privKey.PublicKey
 
-	keypem, err := c.vault.Transit().GetKey(keyId)
+	// get SKI from key
+	ski, err := skiFromPubKey(pubKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key: %v", err)
+		return nil, fmt.Errorf("failed to get SKI from key: %v", err)
 	}
 
-	block, _ := pem.Decode([]byte(keypem))
-	if block == nil {
-		return nil, errors.New("cannot decode key")
-	}
-	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	// import key to vault
+	pb, err := x509.MarshalPKCS8PrivateKey(privKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal private key: %v", err)
 	}
-	ecdsaPubKey, ok := pubKey.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, errors.New("invalid key type, expecting ECDSA Public Key")
+	if err = c.vault.Transit().ImportKey(string(ski), "ecdsa-p256", pb); err != nil {
+		return nil, fmt.Errorf("failed to import key: %v", err)
 	}
 
-	key := &Key{PubKey: ecdsaPubKey}
-	ski := hex.EncodeToString(key.SKI())
-
-	if err = c.storeKeyId(keyId, ski); err != nil {
-		return nil, err
-	}
+	key := &Key{PubKey: pubKey}
 
 	c.keys[ski] = key
 
@@ -147,12 +138,8 @@ func (c CryptoSuite) Sign(k fabcore.Key, digest []byte, opts fabcore.SignerOpts)
 
 		skiBytes := Key.SKI()
 		ski := hex.EncodeToString(skiBytes)
-		kid, err := c.keyIdFromSKI(ski)
-		if err != nil {
-			return nil, err
-		}
 
-		sig, err := c.vault.Transit().Sign(string(kid), digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
+		sig, err := c.vault.Transit().Sign(string(ski), digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
 		if err != nil {
 			return nil, err
 		}
@@ -167,12 +154,8 @@ func (c CryptoSuite) Sign(k fabcore.Key, digest []byte, opts fabcore.SignerOpts)
 
 		skiBytes := Key.SKI()
 		ski := hex.EncodeToString(skiBytes)
-		kid, err := c.keyIdFromSKI(ski)
-		if err != nil {
-			return nil, err
-		}
 
-		sig, err := c.vault.Transit().Sign(string(kid), digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
+		sig, err := c.vault.Transit().Sign(string(ski), digest, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
 		if err != nil {
 			return nil, err
 		}
@@ -213,4 +196,13 @@ func (c CryptoSuite) storeKeyId(keyId, ski string) error {
 
 func (c CryptoSuite) keyIdFromSKI(ski string) ([]byte, error) {
 	return c.db.Get(ski)
+}
+
+func skiFromPubKey(pubKey *ecdsa.PublicKey) (string, error) {
+	raw := elliptic.Marshal(pubKey.Curve, pubKey.X, pubKey.Y)
+	hash := sha256.New()
+	hash.Write(raw)
+	ski := hash.Sum(nil)
+
+	return hex.EncodeToString(ski), nil
 }

@@ -30,7 +30,6 @@ import (
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
-	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
@@ -57,15 +56,12 @@ type idClientWrapper struct {
 	listeners      []SignerUpdateListener
 }
 
-func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, vault *vault.Vault, db kvstore.KVStore, path string) (*idClientWrapper, error) {
+func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, vault *vault.Vault, path string) (*idClientWrapper, error) {
 	configBackend, _ := configProvider()
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 
-	// cs, err := sw.GetSuiteByConfig(cryptoConfig)
-
 	cs, err := vault_cs.NewCryptoSuite(&vault_cs.CryptoSuiteVaultConfig{
 		Vault: vault,
-		DB:    db,
 		Path:  path,
 	})
 	if err != nil {
@@ -86,7 +82,7 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 	}
 	// mgr, err := mspImpl.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig)
 
-	mgr, err := vault_msp.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig, vault, db)
+	mgr, err := vault_msp.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig, vault)
 	if err != nil {
 		return nil, errors.Errorf("Identity manager creation failed. %s", err)
 	}

@@ -15,8 +15,8 @@ type VaultMSPFactory struct {
 }
 
 // NewVaultMSPFactory creates a custom MSPFactory
-func NewVaultMSPFactory(vaultUserStore *CertVaultUserStore, cryptoProvider core.CryptoSuite, db kvstore.KVStore) *VaultMSPFactory {
-	return &VaultMSPFactory{vaultUserStore: vaultUserStore, cryptoProvider: cryptoProvider, db: db}
+func NewVaultMSPFactory(vaultUserStore *CertVaultUserStore, cryptoProvider core.CryptoSuite) *VaultMSPFactory {
+	return &VaultMSPFactory{vaultUserStore: vaultUserStore, cryptoProvider: cryptoProvider}
 }
 
 // CreateUserStore creates UserStore

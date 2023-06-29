@@ -3,32 +3,25 @@ package kvstore
 import (
 	"fmt"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type VaultKeyStore struct {
 	path  string
 	vault *vault.Vault
-	db    kvstore.KVStore
 }
 
-func NewVaultKeyStore(path string, vault *vault.Vault, db kvstore.KVStore) *VaultKeyStore {
+func NewVaultKeyStore(path string, vault *vault.Vault) *VaultKeyStore {
 	return &VaultKeyStore{
 		path:  path,
 		vault: vault,
-		db:    db,
 	}
 }
 
 func (s *VaultKeyStore) Load(key interface{}) (interface{}, error) {
-	keyId, err := s.db.Get(key.(string))
-	if err != nil {
-		return nil, err
-	}
 
 	// path := fmt.Sprintf("%s/%s", s.path, keyId)
-	kv, err := s.vault.Transit().GetKey(string(keyId))
+	kv, err := s.vault.Transit().GetKey(string(key.(string)))
 	if err != nil {
 		return nil, err
 	}

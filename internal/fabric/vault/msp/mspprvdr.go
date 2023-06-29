@@ -29,7 +29,7 @@ func NewMspProvider(endpointConfig fab.EndpointConfig, cryptoSuite core.CryptoSu
 	identityManager := make(map[string]msp.IdentityManager)
 	netConfig := endpointConfig.NetworkConfig()
 	for orgName := range netConfig.Organizations {
-		mgr, err := NewIdentityManager(orgName, userStore, cryptoSuite, endpointConfig, vault, db)
+		mgr, err := NewIdentityManager(orgName, userStore, cryptoSuite, endpointConfig, vault)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to initialize identity manager for organization: %s", orgName)
 		}

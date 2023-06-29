@@ -5,20 +5,17 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk/provider/fabpvdr"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type ProviderFactory struct {
 	vault *vault.Vault
-	db    kvstore.KVStore
 	path  string
 }
 
-func NewProviderFactory(vault *vault.Vault, db kvstore.KVStore, path string) *ProviderFactory {
+func NewProviderFactory(vault *vault.Vault, path string) *ProviderFactory {
 	return &ProviderFactory{
 		vault: vault,
-		db:    db,
 		path:  path,
 	}
 }
@@ -26,7 +23,6 @@ func NewProviderFactory(vault *vault.Vault, db kvstore.KVStore, path string) *Pr
 func (p *ProviderFactory) CreateCryptoSuiteProvider(config fabcore.CryptoSuiteConfig) (fabcore.CryptoSuite, error) {
 	return NewCryptoSuite(&CryptoSuiteVaultConfig{
 		Vault: p.vault,
-		DB:    p.db,
 		Path:  p.path,
 	})
 }

@@ -100,6 +100,17 @@ func (c CryptoSuite) KeyImport(raw interface{}, opts fabcore.KeyImportOpts) (k f
 		pk := &Key{PubKey: raw.(*ecdsa.PublicKey)}
 		c.keys[string(string(pk.SKI()))] = pk
 		return pk, nil
+	case *ecdsa.PrivateKey:
+		privKey := raw.(*ecdsa.PrivateKey)
+		privKeyBytes, _ := x509.MarshalPKCS8PrivateKey(privKey)
+		pubKey := &privKey.PublicKey
+		pk := &Key{PubKey: pubKey}
+		c.keys[string(string(pk.SKI()))] = pk
+		ski := hex.EncodeToString(pk.SKI())
+		if err := c.vault.Transit().ImportKey(string(ski), "ecdsa-p256", privKeyBytes); err != nil {
+			return nil, fmt.Errorf("failed to import key: %v", err)
+		}
+		return pk, nil
 	default:
 		return nil, errors.New("unknown key type")
 	}

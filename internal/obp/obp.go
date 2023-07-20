@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -33,6 +34,15 @@ type OBP struct {
 	org_id        string
 	client_id     string
 	client_secret string
+}
+
+func OBPConfigFromEnv() *OBPConfig {
+	return &OBPConfig{
+		IDCS_ID:      os.Getenv("IDCS_ID"),
+		OrgId:        os.Getenv("ORG_ID"),
+		ClientId:     os.Getenv("CLIENT_ID"),
+		ClientSecret: os.Getenv("CLIENT_SECRET"),
+	}
 }
 
 type LoginOAuthResponse struct {

@@ -33,6 +33,7 @@ import (
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
+	"github.com/hyperledger/firefly-fabconnect/internal/obp"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
@@ -142,13 +143,26 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 		regreq.Type = "client"
 	}
 
+	// register user to OBP IDCS and add to USER_CA group
+	oracle := obp.New(obp.OBPConfigFromEnv())
+	user, err := oracle.CreateValidatedUser(&obp.UserData{
+		Username:   regreq.Name,
+		FamilyName: regreq.Email,
+		GivenName:  regreq.Email,
+		MiddleName: regreq.Email,
+		Email:      regreq.Email,
+	})
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to register user %s to OBP IDCS: %s", regreq.Name, err), 500)
+	}
+
 	rr := &mspApi.RegistrationRequest{
 		Name:           regreq.Name,
 		Type:           regreq.Type,
 		MaxEnrollments: regreq.MaxEnrollments,
 		Affiliation:    regreq.Affiliation,
 		CAName:         regreq.CAName,
-		Secret:         regreq.Secret,
+		Secret:         user.Password,
 	}
 	if regreq.Attributes != nil {
 		rr.Attributes = []mspApi.Attribute{}
@@ -355,13 +369,37 @@ func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, par
 	return &result, nil
 }
 
+type CaListIdentitiesResultResponse struct {
+	Identities []*mspApi.IdentityResponse `json:"identities"`
+}
+type CaListIdentitiesResponse struct {
+	Result CaListIdentitiesResultResponse `json:"result"`
+}
+
+type CaGetIdentityResponse struct {
+	Result *mspApi.IdentityResponse `json:"result"`
+}
+
 func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
-	result, err := w.caClient.GetAllIdentities(params.ByName("caname"))
+
+	registrar, err := w.GetSigningIdentity("jmagly@oneof.com")
 	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", "jmagly", err), 500)
 	}
-	ret := make([]*identity.Identity, len(result))
-	for i, v := range result {
+
+	oracle := obp.New(obp.OBPConfigFromEnv())
+	d, err := oracle.GetIdentities(registrar.EnrollmentCertificate(), registrar.Sign)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get identities: %s", err), 500)
+	}
+
+	var resp CaListIdentitiesResponse
+	if err := json.Unmarshal(d, &resp); err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to unmarshal response: %s", err), 500)
+	}
+
+	ret := make([]*identity.Identity, len(resp.Result.Identities))
+	for i, v := range resp.Result.Identities {
 		newId := identity.Identity{}
 		newId.Name = v.ID
 		newId.MaxEnrollments = v.MaxEnrollments
@@ -381,23 +419,36 @@ func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, param
 
 func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
 	username := params.ByName("username")
-	result, err := w.caClient.GetIdentity(username, params.ByName("caname"))
+
+	registrar, err := w.GetSigningIdentity("jmagly@oneof.com")
 	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", "jmagly", err), 500)
 	}
+
+	oracle := obp.New(obp.OBPConfigFromEnv())
+	d, err := oracle.GetIdentity(username, registrar.EnrollmentCertificate(), registrar.Sign)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to get identities: %s", err), 500)
+	}
+	fmt.Printf("response: %s\n", string(d))
+
+	var resp CaGetIdentityResponse
+	if err := json.Unmarshal(d, &resp); err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to unmarshal response: %s", err), 500)
+	}
+
 	newId := identity.Identity{}
-	newId.Name = result.ID
-	newId.MaxEnrollments = result.MaxEnrollments
-	newId.CAName = result.CAName
-	newId.Type = result.Type
-	newId.Affiliation = result.Affiliation
-	if len(result.Attributes) > 0 {
-		newId.Attributes = make(map[string]string, len(result.Attributes))
-		for _, attr := range result.Attributes {
+	newId.Name = resp.Result.ID
+	newId.MaxEnrollments = resp.Result.MaxEnrollments
+	newId.CAName = resp.Result.CAName
+	newId.Type = resp.Result.Type
+	newId.Affiliation = resp.Result.Affiliation
+	if len(resp.Result.Attributes) > 0 {
+		newId.Attributes = make(map[string]string, len(resp.Result.Attributes))
+		for _, attr := range resp.Result.Attributes {
 			newId.Attributes[attr.Name] = attr.Value
 		}
 	}
-
 	// the SDK identity manager does not persist the certificates
 	// we have to retrieve it from the identity manager
 	si, err := w.identityMgr.GetSigningIdentity(username)

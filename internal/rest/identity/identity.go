@@ -34,6 +34,7 @@ type Identity struct {
 	MSPID          string            `json:"mspId,omitempty"`
 	EnrollmentCert []byte            `json:"enrollmentCert,omitempty"`
 	CACert         []byte            `json:"caCert,omitempty"`
+	Email          string            `json:"email,omitempty"`
 }
 
 type RegisterResponse struct {

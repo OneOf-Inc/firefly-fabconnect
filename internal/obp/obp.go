@@ -26,6 +26,9 @@ type OBPConfig struct {
 	OrgId        string
 	ClientId     string
 	ClientSecret string
+	Registrar    string
+	Admin        string
+	AdminSecret  string
 }
 
 type OBP struct {
@@ -34,6 +37,10 @@ type OBP struct {
 	org_id        string
 	client_id     string
 	client_secret string
+
+	Registrar   string
+	Admin       string
+	AdminSecret string
 }
 
 func OBPConfigFromEnv() *OBPConfig {
@@ -42,6 +49,9 @@ func OBPConfigFromEnv() *OBPConfig {
 		OrgId:        os.Getenv("ORG_ID"),
 		ClientId:     os.Getenv("CLIENT_ID"),
 		ClientSecret: os.Getenv("CLIENT_SECRET"),
+		Registrar:    os.Getenv("REGISTRAR_ID"),
+		Admin:        os.Getenv("ADMIN_ID"),
+		AdminSecret:  os.Getenv("ADMIN_PASSWORD"),
 	}
 }
 
@@ -155,6 +165,9 @@ func New(cfg *OBPConfig) *OBP {
 		org_id:        cfg.OrgId,
 		client_id:     cfg.ClientId,
 		client_secret: cfg.ClientSecret,
+		Registrar:     cfg.Registrar,
+		Admin:         cfg.Admin,
+		AdminSecret:   cfg.AdminSecret,
 	}
 }
 

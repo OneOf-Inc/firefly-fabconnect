@@ -381,13 +381,13 @@ type CaGetIdentityResponse struct {
 }
 
 func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
+	oracle := obp.New(obp.OBPConfigFromEnv())
 
-	registrar, err := w.GetSigningIdentity("jmagly@oneof.com")
+	registrar, err := w.GetSigningIdentity(oracle.Registrar)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", "jmagly", err), 500)
 	}
 
-	oracle := obp.New(obp.OBPConfigFromEnv())
 	d, err := oracle.GetIdentities(registrar.EnrollmentCertificate(), registrar.Sign)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get identities: %s", err), 500)
@@ -420,12 +420,13 @@ func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, param
 func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
 	username := params.ByName("username")
 
-	registrar, err := w.GetSigningIdentity("jmagly@oneof.com")
+	oracle := obp.New(obp.OBPConfigFromEnv())
+
+	registrar, err := w.GetSigningIdentity(oracle.Registrar)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", "jmagly", err), 500)
 	}
 
-	oracle := obp.New(obp.OBPConfigFromEnv())
 	d, err := oracle.GetIdentity(username, registrar.EnrollmentCertificate(), registrar.Sign)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get identities: %s", err), 500)

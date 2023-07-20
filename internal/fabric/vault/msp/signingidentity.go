@@ -3,6 +3,7 @@ package msp
 import (
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 
@@ -10,14 +11,18 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric/bccsp/utils"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
+	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type SigningIdentity struct {
 	*Identity
 
 	v *vault.Vault
+}
+
+func SigningIdentityMgrWithVault(v *vault.Vault) (*SigningIdentity, error) {
+	return &SigningIdentity{v: v}, nil
 }
 
 func WithVaultConfig(cfg *vault.Config) (*SigningIdentity, error) {
@@ -48,6 +53,7 @@ func (s *SigningIdentity) NewSigningIdentity(mspid, user, cert string) (*Signing
 			Key:     &core.Key{ID: user, PubKey: ecdsaPubKey},
 			IDBytes: []byte(cert),
 		},
+		v: s.v,
 	}
 
 	return identity, nil
@@ -55,7 +61,9 @@ func (s *SigningIdentity) NewSigningIdentity(mspid, user, cert string) (*Signing
 
 // Sign the message
 func (s *SigningIdentity) Sign(msg []byte) ([]byte, error) {
-	sig, err := s.VaultTransit.Sign(s.Key.ID, msg, &vault.SignOpts{Hash: "sha2-256", Preshashed: false})
+	skiBytes := s.Key.SKI()
+	ski := hex.EncodeToString(skiBytes)
+	sig, err := s.v.Transit().Sign(ski, msg, &vault.SignOpts{Hash: "sha2-256", Preshashed: true})
 	if err != nil {
 		return nil, err
 	}

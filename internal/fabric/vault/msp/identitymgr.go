@@ -31,6 +31,7 @@ type IdentityManager struct {
 	mspCertStore    fabcore.KVStore
 	mspSecretStore  fabcore.KVStore
 	userStore       msp.UserStore
+	vault           *vault.Vault
 }
 
 func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fabcore.CryptoSuite, endpointConfig fab.EndpointConfig, vault *vault.Vault) (*IdentityManager, error) {
@@ -70,6 +71,7 @@ func NewIdentityManager(orgName string, userStore msp.UserStore, cryptoSuite fab
 		mspSecretStore:  mspSecretStore,
 		embeddedUsers:   orgConfig.Users,
 		userStore:       userStore,
+		vault:           vault,
 	}
 	return mgr, nil
 }
@@ -107,11 +109,24 @@ func (mgr *IdentityManager) CreateSigningIdentity(opts ...msp.SigningIdentityOpt
 }
 
 func (mgr *IdentityManager) GetSigningIdentity(id string) (msp.SigningIdentity, error) {
-	user, err := mgr.GetUser(id)
+	cert, err := mgr.mspCertStore.Load(id)
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+	smgr, err := SigningIdentityMgrWithVault(mgr.vault)
+	if err != nil {
+		return nil, err
+	}
+	s, err := smgr.NewSigningIdentity(mgr.orgMSPID, id, cert.(string))
+	if err != nil {
+		return nil, err
+	}
+
+	// user, err := mgr.GetUser(id)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	return s, nil
 }
 
 func (mgr *IdentityManager) GetUser(username string) (*User, error) {

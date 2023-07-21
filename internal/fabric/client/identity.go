@@ -77,7 +77,6 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 		return nil, errors.Errorf("Failed to import registrar credentials: %s", err)
 	}
 
-
 	endpointConfig, err := fabImpl.ConfigFromBackend(configBackend...)
 	if err != nil {
 		return nil, errors.Errorf("Failed to read config: %s", err)
@@ -149,14 +148,20 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 		regreq.Type = "client"
 	}
 
+	// ToDo: add default email if email does not exist
+	email := regreq.Email
+	if email == "" {
+		email = "info@oneof.com"
+	}
+
 	// register user to OBP IDCS and add to USER_CA group
 	oracle := obp.New(obp.OBPConfigFromEnv())
 	user, err := oracle.CreateValidatedUser(&obp.UserData{
 		Username:   regreq.Name,
-		FamilyName: regreq.Email,
-		GivenName:  regreq.Email,
-		MiddleName: regreq.Email,
-		Email:      regreq.Email,
+		FamilyName: regreq.Name,
+		GivenName:  regreq.Name,
+		MiddleName: regreq.Name,
+		Email:      email,
 	})
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to register user %s to OBP IDCS: %s", regreq.Name, err), 500)

@@ -37,7 +37,7 @@ func (vw *VaultWallet) Put(label string, content []byte) error {
 
 	certpath := fmt.Sprintf("%s/certs/%s", vw.mspid, label)
 	if err := vw.v.Secret().WriteSecret(certpath, map[string]interface{}{
-		"certificate": x.Credentials.Certificate,
+		label: x.Credentials.Certificate,
 	}); err != nil {
 		return fmt.Errorf("failed to write certificate: %w", err)
 	}

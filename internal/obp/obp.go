@@ -208,6 +208,10 @@ func (obp *OBP) loginByOauth() (*LoginOAuthResponse, error) {
 		return nil, err
 	}
 
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		return nil, fmt.Errorf("login failed: %s", string(body))
+	}
+
 	var resp LoginOAuthResponse
 	if err = json.Unmarshal(body, &resp); err != nil {
 		return nil, err
@@ -274,6 +278,10 @@ func (obp *OBP) CreateUser(userData *UserData, password string) (*CreateUserResp
 		return nil, err
 	}
 
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		return nil, fmt.Errorf("create user failed: %s", string(body))
+	}
+
 	var resp CreateUserResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, err
@@ -318,6 +326,10 @@ func (obp *OBP) ChangePassword(userID, newPassword string) (*ChangePasswordRespo
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		return nil, fmt.Errorf("change password failed: %s", string(body))
 	}
 
 	var resp ChangePasswordResponse
@@ -366,6 +378,10 @@ func (obp *OBP) ValidateUser(username, password string) (*ValidateUserResponse, 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		return nil, fmt.Errorf("validate user failed: %s", string(body))
 	}
 
 	var resp ValidateUserResponse
@@ -425,6 +441,11 @@ func (obp *OBP) AddUserToUserCAGroup(userID string) (*AddUserToGroupResponse, er
 	if err != nil {
 		return nil, err
 	}
+
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		return nil, fmt.Errorf("add user to ca group failed: %s", string(body))
+	}
+
 
 	var resp AddUserToGroupResponse
 	if err := json.Unmarshal(body, &resp); err != nil {

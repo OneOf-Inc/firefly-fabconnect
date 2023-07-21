@@ -3,6 +3,7 @@ package obp
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -11,6 +12,45 @@ import (
 const (
 	OBP_CA_IDENTITIES_URI = "/api/v1/identities"
 )
+
+type GetRegistrarCredentialsResponse struct {
+	AdminKey  string `json:"adminKey"`
+	AdminCert string `json:"adminCert"`
+}
+
+func (obp *OBP) GetRegistrarCredentials() (*GetRegistrarCredentialsResponse, error) {
+	token := getBasicAuthToken(obp.Admin, obp.AdminSecret)
+
+	client := &http.Client{}
+	url := "https://bps01-oneof-iad.blockchain.ocp.oraclecloud.com:7443" + "/console/admin/api/v2/organizations/bps01/adminCredentials"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", token))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// parse response
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, err
+	}
+
+	var adminCreds GetRegistrarCredentialsResponse
+	if err := json.Unmarshal(data, &adminCreds); err != nil {
+		return nil, err
+	}
+
+	return &adminCreds, nil
+}
 
 func (obp *OBP) GetIdentities(registrarCert []byte, Sign func([]byte) ([]byte, error)) ([]byte, error) {
 	uri := OBP_CA_IDENTITIES_URI

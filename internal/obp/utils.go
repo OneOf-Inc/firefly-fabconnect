@@ -1,6 +1,8 @@
 package obp
 
 import (
+	"encoding/base64"
+	"fmt"
 	"math/rand"
 	"strings"
 )
@@ -44,4 +46,9 @@ func generatePassword(passwordLength, minSpecialChar, minNum, minUpperCase int) 
 		inRune[i], inRune[j] = inRune[j], inRune[i]
 	})
 	return string(inRune)
+}
+
+func getBasicAuthToken(username, password string) string {
+	token := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+	return token
 }

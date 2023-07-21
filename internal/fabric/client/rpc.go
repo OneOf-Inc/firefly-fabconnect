@@ -17,10 +17,7 @@
 package client
 
 import (
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
@@ -75,38 +72,6 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 		return nil, nil, errors.Errorf("Failed to create a new CryptoSuite instance. %s", err)
 	}
 	mspfactory := vault_msp.NewVaultMSPFactory(userStore, cs)
-
-	adminCert, err := ioutil.ReadFile("/home/hossein/workspace/oneof/firefly-fabconnect/etc/firefly/organizations/peerOrganizations/org1.example.com/admin/bps01-cert.pem")
-	if err != nil {
-		return nil, nil, errors.Errorf("Failed to read admin certificate. %s", err)
-	}
-	adminKey, err := ioutil.ReadFile("/home/hossein/workspace/oneof/firefly-fabconnect/etc/firefly/organizations/peerOrganizations/org1.example.com/admin/bps01-key")
-	if err != nil {
-		return nil, nil, errors.Errorf("Failed to read admin key. %s", err)
-	}
-	// convert pem to ecdsa.PrivateKey
-	adminCertBlock, _ := pem.Decode(adminCert)
-	adminCertX509, err := x509.ParseCertificate(adminCertBlock.Bytes)
-	if err != nil {
-		return nil, nil, errors.Errorf("Failed to parse admin certificate. %s", err)
-	}
-
-	adminKeyBlock, _ := pem.Decode(adminKey)
-	if adminKeyBlock == nil || adminKeyBlock.Type != "PRIVATE KEY" {
-		log.Fatal("Failed to decode PEM block containing EC private key")
-	}
-	key, err := x509.ParsePKCS8PrivateKey(adminKeyBlock.Bytes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_, err = cs.KeyImport(adminCertX509, nil)
-	if err != nil {
-		return nil, nil, errors.Errorf("Failed to import admin certificate. %s", err)
-	}
-	_, err = cs.KeyImport(key, nil)
-	if err != nil {
-		return nil, nil, errors.Errorf("Failed to import admin key. %s", err)
-	}
 
 	sdk, err := fabsdk.New(configProvider, fabsdk.WithMSPPkg(mspfactory), fabsdk.WithCorePkg(vault_cs.NewProviderFactory(vault, certStorePath)))
 	if err != nil {

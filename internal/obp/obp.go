@@ -173,7 +173,7 @@ func New(cfg *OBPConfig) *OBP {
 
 func (obp *OBP) getBasicAuthToken() string {
 	user := fmt.Sprintf("%s-%s", obp.org_id, obp.client_id)
-	token := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", user, obp.client_secret)))
+	token := getBasicAuthToken(user, obp.client_secret)
 	return token
 }
 

@@ -72,6 +72,12 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 		return nil, errors.Errorf("Failed to get suite by config: %s", err)
 	}
 
+	// import OBP CA Registrar credentials
+	if err = importRegistrar(cs); err != nil {
+		return nil, errors.Errorf("Failed to import registrar credentials: %s", err)
+	}
+
+
 	endpointConfig, err := fabImpl.ConfigFromBackend(configBackend...)
 	if err != nil {
 		return nil, errors.Errorf("Failed to read config: %s", err)
@@ -492,4 +498,41 @@ func (w *idClientWrapper) notifySignerUpdate(signer string) {
 	for _, listener := range w.listeners {
 		listener.SignerUpdated(signer)
 	}
+}
+
+func importRegistrar(cs vault_cs.CryptoSuite) error {
+	oracle := obp.New(obp.OBPConfigFromEnv())
+	registrar, err := oracle.GetRegistrarCredentials()
+	if err != nil {
+		return errors.Errorf("Failed to get registrar credentials. %s", err)
+	}
+	fmt.Printf("registrar: %s\n", registrar)
+
+	// convert pem to ecdsa.PrivateKey
+	adminCertBlock, _ := pem.Decode([]byte(registrar.AdminCert))
+	adminCertX509, err := x509.ParseCertificate(adminCertBlock.Bytes)
+	if err != nil {
+		return errors.Errorf("Failed to parse admin certificate. %s", err)
+	}
+
+	// convert pem to ecdsa.PrivateKey
+	adminKeyBlock, _ := pem.Decode([]byte(registrar.AdminKey))
+	if adminKeyBlock == nil || adminKeyBlock.Type != "PRIVATE KEY" {
+		log.Fatal("Failed to decode PEM block containing EC private key")
+	}
+	key, err := x509.ParsePKCS8PrivateKey(adminKeyBlock.Bytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = cs.KeyImport(adminCertX509, nil)
+	if err != nil {
+		return errors.Errorf("Failed to import admin certificate. %s", err)
+	}
+	_, err = cs.KeyImport(key, nil)
+	if err != nil {
+		return errors.Errorf("Failed to import admin key. %s", err)
+	}
+
+	return nil
 }

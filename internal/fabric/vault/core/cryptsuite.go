@@ -86,27 +86,40 @@ func (c CryptoSuite) KeyImport(raw interface{}, opts fabcore.KeyImportOpts) (k f
 			return nil, errors.New("invalid key type, it must be ECDSA Public Key")
 		}
 
+		// get cert PEM String
+		pemCert := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		})
+	
+		// Convert the PEM-encoded byte slice to a string
+		pemString := string(pemCert)
 		err = c.vault.Secret().WriteSecret(fmt.Sprintf("%s/%s", c.path, cert.Subject.CommonName), map[string]interface{}{
-			"cert": string(cert.Raw),
+			cert.Subject.CommonName: pemString,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to write secret: %v", err)
 		}
 
 		pk := &Key{PubKey: pubKey}
-		c.keys[string(string(pk.SKI()))] = pk
 		return pk, nil
 	case *ecdsa.PublicKey:
 		pk := &Key{PubKey: raw.(*ecdsa.PublicKey)}
-		c.keys[string(string(pk.SKI()))] = pk
 		return pk, nil
 	case *ecdsa.PrivateKey:
 		privKey := raw.(*ecdsa.PrivateKey)
 		privKeyBytes, _ := x509.MarshalPKCS8PrivateKey(privKey)
 		pubKey := &privKey.PublicKey
 		pk := &Key{PubKey: pubKey}
-		c.keys[string(string(pk.SKI()))] = pk
 		ski := hex.EncodeToString(pk.SKI())
+		
+		// ToDo remove the key and import new version
+		tpk, err := c.GetKey([]byte(ski))
+		if err == nil {
+			return tpk, nil
+		}
+
+		// c.keys[string(string(pk.SKI()))] = pk
 		if err := c.vault.Transit().ImportKey(string(ski), "ecdsa-p256", privKeyBytes); err != nil {
 			return nil, fmt.Errorf("failed to import key: %v", err)
 		}

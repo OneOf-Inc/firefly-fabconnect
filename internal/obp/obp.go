@@ -26,6 +26,7 @@ type OBPConfig struct {
 	OrgId        string
 	ClientId     string
 	ClientSecret string
+	CAUrl        string
 	Registrar    string
 	Admin        string
 	AdminSecret  string
@@ -38,6 +39,7 @@ type OBP struct {
 	client_id     string
 	client_secret string
 
+	caUrl       string
 	Registrar   string
 	Admin       string
 	AdminSecret string
@@ -49,6 +51,7 @@ func OBPConfigFromEnv() *OBPConfig {
 		OrgId:        os.Getenv("ORG_ID"),
 		ClientId:     os.Getenv("CLIENT_ID"),
 		ClientSecret: os.Getenv("CLIENT_SECRET"),
+		CAUrl:        os.Getenv("CA_URL"),
 		Registrar:    os.Getenv("REGISTRAR_ID"),
 		Admin:        os.Getenv("ADMIN_ID"),
 		AdminSecret:  os.Getenv("ADMIN_PASSWORD"),
@@ -159,12 +162,18 @@ type AddUserToGroupResponse struct {
 	ID string `json:"id"`
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+}
+
 func New(cfg *OBPConfig) *OBP {
 	return &OBP{
 		idcs_id:       cfg.IDCS_ID,
 		org_id:        cfg.OrgId,
 		client_id:     cfg.ClientId,
 		client_secret: cfg.ClientSecret,
+		caUrl:         cfg.CAUrl,
 		Registrar:     cfg.Registrar,
 		Admin:         cfg.Admin,
 		AdminSecret:   cfg.AdminSecret,
@@ -445,7 +454,6 @@ func (obp *OBP) AddUserToUserCAGroup(userID string) (*AddUserToGroupResponse, er
 	if res.StatusCode != 201 && res.StatusCode != 200 {
 		return nil, fmt.Errorf("add user to ca group failed: %s", string(body))
 	}
-
 
 	var resp AddUserToGroupResponse
 	if err := json.Unmarshal(body, &resp); err != nil {

@@ -22,7 +22,7 @@ func (obp *OBP) GetRegistrarCredentials() (*GetRegistrarCredentialsResponse, err
 	token := getBasicAuthToken(obp.Admin, obp.AdminSecret)
 
 	client := &http.Client{}
-	url := "https://bps01-oneof-iad.blockchain.ocp.oraclecloud.com:7443" + "/console/admin/api/v2/organizations/bps01/adminCredentials"
+	url := fmt.Sprintf("%s/console/admin/api/v2/organizations/%s/adminCredentials", obp.caUrl, obp.org_id)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,11 @@ func (obp *OBP) GetRegistrarCredentials() (*GetRegistrarCredentialsResponse, err
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
-		return nil, err
+		var err_rsp ErrorResponse
+		if err := json.Unmarshal([]byte(data), &err_rsp); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("retrieve registrar failed %s", err_rsp.ErrorDescription)
 	}
 
 	var adminCreds GetRegistrarCredentialsResponse
@@ -61,7 +65,7 @@ func (obp *OBP) GetIdentities(registrarCert []byte, Sign func([]byte) ([]byte, e
 	}
 
 	client := &http.Client{}
-	url := "https://bps01-oneof-iad.blockchain.ocp.oraclecloud.com:7443" + uri
+	url := fmt.Sprintf("https://%s-oneof-iad.blockchain.ocp.oraclecloud.com:7443/%s", obp.org_id, uri)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -95,7 +99,7 @@ func (obp *OBP) GetIdentity(username string, registrarCert []byte, Sign func([]b
 	}
 
 	client := &http.Client{}
-	url := "https://bps01-oneof-iad.blockchain.ocp.oraclecloud.com:7443" + uri
+	url := fmt.Sprintf("https://%s-oneof-iad.blockchain.ocp.oraclecloud.com:7443/%s", obp.org_id, uri)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

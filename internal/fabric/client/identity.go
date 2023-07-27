@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	fabcontext "github.com/hyperledger/fabric-sdk-go/pkg/context"
+	"github.com/hyperledger/fabric-sdk-go/pkg/core/config/lookup"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	fabImpl "github.com/hyperledger/fabric-sdk-go/pkg/fab"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
@@ -58,6 +59,7 @@ type idClientWrapper struct {
 	identityMgr    msp.IdentityManager
 	caClient       dep.CAClient
 	listeners      []SignerUpdateListener
+	oracle         *obp.OBP
 }
 
 func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore, vault *vault.Vault, path string) (*idClientWrapper, error) {
@@ -73,7 +75,9 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 	}
 
 	// import OBP CA Registrar credentials
-	if err = importRegistrar(cs); err != nil {
+	obpCfg := getOBPCfg(configBackend)
+	oracle := obp.New(obpCfg)
+	if err = importRegistrar(oracle, cs); err != nil {
 		return nil, errors.Errorf("Failed to import registrar credentials: %s", err)
 	}
 
@@ -120,6 +124,7 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 		identityMgr:    mgr,
 		caClient:       caClient,
 		listeners:      listeners,
+		oracle:         oracle,
 	}
 	return idc, nil
 }
@@ -155,8 +160,8 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 	}
 
 	// register user to OBP IDCS and add to USER_CA group
-	oracle := obp.New(obp.OBPConfigFromEnv())
-	user, err := oracle.CreateValidatedUser(&obp.UserData{
+	// oracle := obp.New(obp.OBPConfigFromEnv())
+	user, err := w.oracle.CreateValidatedUser(&obp.UserData{
 		Username:   regreq.Name,
 		FamilyName: regreq.Name,
 		GivenName:  regreq.Name,
@@ -392,14 +397,14 @@ type CaGetIdentityResponse struct {
 }
 
 func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
-	oracle := obp.New(obp.OBPConfigFromEnv())
+	// oracle := obp.New(obp.OBPConfigFromEnv())
 
-	registrar, err := w.GetSigningIdentity(oracle.Registrar)
+	registrar, err := w.GetSigningIdentity(w.oracle.Registrar)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", "jmagly", err), 500)
 	}
 
-	d, err := oracle.GetIdentities(registrar.EnrollmentCertificate(), registrar.Sign)
+	d, err := w.oracle.GetIdentities(registrar.EnrollmentCertificate(), registrar.Sign)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get identities: %s", err), 500)
 	}
@@ -431,18 +436,17 @@ func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, param
 func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
 	username := params.ByName("username")
 
-	oracle := obp.New(obp.OBPConfigFromEnv())
+	// oracle := obp.New(obp.OBPConfigFromEnv())
 
-	registrar, err := w.GetSigningIdentity(oracle.Registrar)
+	registrar, err := w.GetSigningIdentity(w.oracle.Registrar)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get signing identity for user %s: %s", "jmagly", err), 500)
 	}
 
-	d, err := oracle.GetIdentity(username, registrar.EnrollmentCertificate(), registrar.Sign)
+	d, err := w.oracle.GetIdentity(username, registrar.EnrollmentCertificate(), registrar.Sign)
 	if err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("failed to get identities: %s", err), 500)
 	}
-	fmt.Printf("response: %s\n", string(d))
 
 	var resp CaGetIdentityResponse
 	if err := json.Unmarshal(d, &resp); err != nil {
@@ -505,13 +509,11 @@ func (w *idClientWrapper) notifySignerUpdate(signer string) {
 	}
 }
 
-func importRegistrar(cs vault_cs.CryptoSuite) error {
-	oracle := obp.New(obp.OBPConfigFromEnv())
+func importRegistrar(oracle *obp.OBP, cs vault_cs.CryptoSuite) error {
 	registrar, err := oracle.GetRegistrarCredentials()
 	if err != nil {
 		return errors.Errorf("Failed to get registrar credentials. %s", err)
 	}
-	fmt.Printf("registrar: %s\n", registrar)
 
 	// convert pem to ecdsa.PrivateKey
 	adminCertBlock, _ := pem.Decode([]byte(registrar.AdminCert))
@@ -540,4 +542,34 @@ func importRegistrar(cs vault_cs.CryptoSuite) error {
 	}
 
 	return nil
+}
+
+type Organization struct {
+	MspID                  string   `json:"mspid"`
+	CertificateAuthorities []string `json:"certificateAuthorities"`
+}
+
+func getOBPCfg(configBackend []core.ConfigBackend) *obp.OBPConfig {
+	cfg := obp.OBPConfigFromEnv()
+
+	l := lookup.New(configBackend...)
+
+	var client msp.ClientConfig
+	l.UnmarshalKey("client", &client)
+	organization := client.Organization
+
+	var orgs map[string]Organization
+	l.UnmarshalKey("organizations", &orgs)
+	mspId := orgs[organization].MspID
+
+	caName := orgs[organization].CertificateAuthorities[0]
+
+	var certificateAuthorities map[string]msp.CAConfig
+	l.UnmarshalKey("certificateAuthorities", &certificateAuthorities)
+
+	cfg.OrgID = mspId
+	cfg.CAUrl = certificateAuthorities[caName].URL
+	cfg.Registrar = certificateAuthorities[caName].Registrar.EnrollID
+
+	return cfg
 }

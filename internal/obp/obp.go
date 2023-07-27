@@ -23,7 +23,7 @@ const (
 
 type OBPConfig struct {
 	IDCS_ID      string
-	OrgId        string
+	OrgID        string
 	ClientId     string
 	ClientSecret string
 	CAUrl        string
@@ -48,11 +48,8 @@ type OBP struct {
 func OBPConfigFromEnv() *OBPConfig {
 	return &OBPConfig{
 		IDCS_ID:      os.Getenv("IDCS_ID"),
-		OrgId:        os.Getenv("ORG_ID"),
 		ClientId:     os.Getenv("CLIENT_ID"),
 		ClientSecret: os.Getenv("CLIENT_SECRET"),
-		CAUrl:        os.Getenv("CA_URL"),
-		Registrar:    os.Getenv("REGISTRAR_ID"),
 		Admin:        os.Getenv("ADMIN_ID"),
 		AdminSecret:  os.Getenv("ADMIN_PASSWORD"),
 	}
@@ -170,9 +167,9 @@ type ErrorResponse struct {
 func New(cfg *OBPConfig) *OBP {
 	return &OBP{
 		idcs_id:       cfg.IDCS_ID,
-		org_id:        cfg.OrgId,
 		client_id:     cfg.ClientId,
 		client_secret: cfg.ClientSecret,
+		org_id:        cfg.OrgID,
 		caUrl:         cfg.CAUrl,
 		Registrar:     cfg.Registrar,
 		Admin:         cfg.Admin,

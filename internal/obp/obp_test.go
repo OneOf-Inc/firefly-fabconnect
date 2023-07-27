@@ -17,7 +17,7 @@ const (
 func TestGetBasicAuthToken(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -30,7 +30,7 @@ func TestGetBasicAuthToken(t *testing.T) {
 func TestGetBaseUrl(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -42,7 +42,7 @@ func TestGetBaseUrl(t *testing.T) {
 func TestLoginByOauth(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -55,7 +55,7 @@ func TestLoginByOauth(t *testing.T) {
 func TestCreateUser(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -77,7 +77,7 @@ func TestCreateUser(t *testing.T) {
 func TestChangePassword(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -93,7 +93,7 @@ func TestChangePassword(t *testing.T) {
 func TestValidateUser(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -109,7 +109,7 @@ func TestValidateUser(t *testing.T) {
 func TestAddUserToUserCAGroup(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})
@@ -124,7 +124,7 @@ func TestAddUserToUserCAGroup(t *testing.T) {
 func TestAll(t *testing.T) {
 	obp := New(&OBPConfig{
 		IDCS_ID:      idcs_id,
-		OrgId:        org_id,
+		OrgID:        org_id,
 		ClientId:     client_id,
 		ClientSecret: client_secret,
 	})

@@ -75,8 +75,8 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 	}
 
 	// import OBP CA Registrar credentials
-	obpCfg := getOBPCfg(configBackend)
-	oracle := obp.New(obpCfg)
+	obpCfg := getOBPCfg(configBackend, vault)
+	oracle := obp.New(vault, obpCfg)
 	if err = importRegistrar(oracle, cs); err != nil {
 		return nil, errors.Errorf("Failed to import registrar credentials: %s", err)
 	}
@@ -549,9 +549,10 @@ type Organization struct {
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 }
 
-func getOBPCfg(configBackend []core.ConfigBackend) *obp.OBPConfig {
+func getOBPCfg(configBackend []core.ConfigBackend, v *vault.Vault) *obp.OBPConfig {
 	cfg := obp.OBPConfigFromEnv()
 
+	// cfg := obp.OBPConfigFromEnv()
 	l := lookup.New(configBackend...)
 
 	var client msp.ClientConfig

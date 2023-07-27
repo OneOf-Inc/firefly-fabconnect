@@ -129,10 +129,20 @@ type ErrorResponse struct {
 	ErrorDescription string `json:"error_description"`
 }
 
-func (obp *OBP) getBasicAuthToken() string {
-	user := fmt.Sprintf("%s-%s", obp.org_id, obp.client_id)
-	token := getBasicAuthToken(user, obp.client_secret)
-	return token
+func (obp *OBP) getClientBasicAuthToken() (string, error) {
+	client, err := obp.v.Secret().ReadSecret("OBP/client")
+	if err != nil {
+		return "", fmt.Errorf("failed to read admin secret from vault: %w", err)
+	}
+	if client == nil || client["CLIENT_ID"] == nil || client["CLIENT_SECRET"] == nil {
+		return "", fmt.Errorf("client secret not found in vault")
+	}
+	clientID := client["CLIENT_ID"].(string)
+	clientSecret := client["CLIENT_SECRET"].(string)
+
+	user := fmt.Sprintf("%s-%s", obp.org_id, clientID)
+	token := getBasicAuthToken(user, clientSecret)
+	return token, nil
 }
 
 func (obp *OBP) getBaseUrl() string {
@@ -151,7 +161,10 @@ func (obp *OBP) loginByOauth() (*LoginOAuthResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	basicAuthToken := obp.getBasicAuthToken()
+	basicAuthToken, err := obp.getClientBasicAuthToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get basic auth token: %w", err)
+	}
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", basicAuthToken))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 

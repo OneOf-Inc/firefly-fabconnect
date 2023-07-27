@@ -19,7 +19,10 @@ type GetRegistrarCredentialsResponse struct {
 }
 
 func (obp *OBP) GetRegistrarCredentials() (*GetRegistrarCredentialsResponse, error) {
-	token := getBasicAuthToken(obp.Admin, obp.AdminSecret)
+	token, err := obp.getAdminBasicAuthToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admin basic auth token: %w", err)
+	}
 
 	client := &http.Client{}
 	url := fmt.Sprintf("%s/console/admin/api/v2/organizations/%s/adminCredentials", obp.caUrl, obp.org_id)
@@ -145,6 +148,21 @@ func getEcdsaAuthToken(cert []byte, uri string, Sign func([]byte) ([]byte, error
 	b64sig := base64.StdEncoding.EncodeToString(sig)
 
 	token := b64cert + "." + b64sig
+
+	return token, nil
+}
+
+func (obp *OBP) getAdminBasicAuthToken() (string, error) {
+	admin, err := obp.v.Secret().ReadSecret("OBP/admin")
+	if err != nil {
+		return "", fmt.Errorf("failed to read admin secret from vault: %w", err)
+	}
+	if admin == nil || admin["ADMIN_ID"] == nil || admin["ADMIN_PASSWORD"] == nil {
+		return "", fmt.Errorf("admin secret not found in vault")
+	}
+	adminID := admin["ADMIN_ID"].(string)
+	adminPassword := admin["ADMIN_PASSWORD"].(string)
+	token := getBasicAuthToken(adminID, adminPassword)
 
 	return token, nil
 }

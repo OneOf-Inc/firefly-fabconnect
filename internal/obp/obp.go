@@ -2,51 +2,39 @@ package obp
 
 import (
 	"os"
+
+	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type OBPConfig struct {
-	IDCS_ID      string
-	OrgID        string
-	ClientId     string
-	ClientSecret string
-	CAUrl        string
-	Registrar    string
-	Admin        string
-	AdminSecret  string
+	IDCS_ID string
+	OrgID   string
+	CAUrl     string
+	Registrar string
 }
 
 type OBP struct {
 	idcs_id string
 
-	org_id        string
-	client_id     string
-	client_secret string
+	org_id    string
+	caUrl     string
+	Registrar string
 
-	caUrl       string
-	Registrar   string
-	Admin       string
-	AdminSecret string
+	v *vault.Vault
 }
 
 func OBPConfigFromEnv() *OBPConfig {
 	return &OBPConfig{
-		IDCS_ID:      os.Getenv("IDCS_ID"),
-		ClientId:     os.Getenv("CLIENT_ID"),
-		ClientSecret: os.Getenv("CLIENT_SECRET"),
-		Admin:        os.Getenv("ADMIN_ID"),
-		AdminSecret:  os.Getenv("ADMIN_PASSWORD"),
+		IDCS_ID: os.Getenv("IDCS_ID"),
 	}
 }
 
-func New(cfg *OBPConfig) *OBP {
+func New(v *vault.Vault, cfg *OBPConfig) *OBP {
 	return &OBP{
-		idcs_id:       cfg.IDCS_ID,
-		client_id:     cfg.ClientId,
-		client_secret: cfg.ClientSecret,
-		org_id:        cfg.OrgID,
-		caUrl:         cfg.CAUrl,
-		Registrar:     cfg.Registrar,
-		Admin:         cfg.Admin,
-		AdminSecret:   cfg.AdminSecret,
+		idcs_id: cfg.IDCS_ID,
+		org_id:    cfg.OrgID,
+		caUrl:     cfg.CAUrl,
+		Registrar: cfg.Registrar,
+		v:         v,
 	}
 }

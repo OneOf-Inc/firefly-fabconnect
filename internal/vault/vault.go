@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/hashicorp/vault/api"
@@ -20,17 +21,39 @@ type Vault struct {
 }
 
 type Config struct {
-	Address  string
-	RoleID   string
-	SecretID string
+	Address       string
+	RoleID        string
+	SecretID      string
+	TLSCaCert     string
+	TLSClientCert string
+	TLSClientKey  string
 	*TransitConfig
 	*SecretsConfig
 }
 
 func New(cfg *Config) (*Vault, error) {
-	client, err := api.NewClient(&api.Config{
+	vaultConfig := &api.Config{
 		Address: cfg.Address,
-	})
+	}
+
+	// verify if address is https
+	parsedurl, err := url.Parse(cfg.Address)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse vault address: %w", err)
+	}
+	if parsedurl.Scheme != "https" {
+		tlsCfg := api.TLSConfig{
+			CACert:     cfg.TLSCaCert,
+			ClientCert: cfg.TLSClientCert,
+			ClientKey:  cfg.TLSClientKey,
+		}
+		if err := vaultConfig.ConfigureTLS(&tlsCfg); err != nil {
+			return nil, fmt.Errorf("unable to configure TLS: %w", err)
+		}
+	}
+
+	client, err := api.NewClient(vaultConfig)
+
 	if err != nil {
 		return nil, err
 	}

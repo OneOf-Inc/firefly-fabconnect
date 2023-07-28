@@ -281,10 +281,10 @@ func (obp *OBP) ChangePassword(userID, newPassword string) (*ChangePasswordRespo
 
 	client := &http.Client{}
 	req, err := http.NewRequest(method, url, io.Reader(strings.NewReader(string(payload))))
-
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", login.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
 
@@ -333,10 +333,10 @@ func (obp *OBP) ValidateUser(username, password string) (*ValidateUserResponse, 
 
 	client := &http.Client{}
 	req, err := http.NewRequest(method, url, io.Reader(strings.NewReader(string(payload))))
-
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", login.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
 
@@ -395,10 +395,10 @@ func (obp *OBP) AddUserToUserCAGroup(userID string) (*AddUserToGroupResponse, er
 
 	client := &http.Client{}
 	req, err := http.NewRequest(method, url, io.Reader(strings.NewReader(string(payload))))
-
 	if err != nil {
 		return nil, err
 	}
+	
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", login.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
 
@@ -431,14 +431,14 @@ type ValidatedUser struct {
 }
 
 func (obp *OBP) CreateValidatedUser(userData *UserData) (*ValidatedUser, error) {
-	password := generatePassword(12, 1, 1, 1)
+	password := generatePassword(12, 1, 1, 1, 1)
 
 	user, err := obp.CreateUser(userData, password)
 	if err != nil {
 		return nil, err
 	}
 
-	newPassword := generatePassword(12, 1, 1, 1)
+	newPassword := generatePassword(12, 1, 1, 1, 1)
 	userID := user.ID
 
 	_, err = obp.ChangePassword(userID, newPassword)

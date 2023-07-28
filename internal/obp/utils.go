@@ -15,7 +15,7 @@ var (
 	allCharSet     = lowerCharSet + upperCharSet + specialCharSet + numberSet
 )
 
-func generatePassword(passwordLength, minSpecialChar, minNum, minUpperCase int) string {
+func generatePassword(passwordLength, minSpecialChar, minNum, minUpperCase, minLowercase int) string {
 	var password strings.Builder
 
 	//Set special character
@@ -36,7 +36,13 @@ func generatePassword(passwordLength, minSpecialChar, minNum, minUpperCase int) 
 		password.WriteString(string(upperCharSet[random]))
 	}
 
-	remainingLength := passwordLength - minSpecialChar - minNum - minUpperCase
+	//Set lowercase
+	for i := 0; i < minLowercase; i++ {
+		random := rand.Intn(len(lowerCharSet))
+		password.WriteString(string(lowerCharSet[random]))
+	}
+
+	remainingLength := passwordLength - minSpecialChar - minNum - minUpperCase - minLowercase
 	for i := 0; i < remainingLength; i++ {
 		random := rand.Intn(len(allCharSet))
 		password.WriteString(string(allCharSet[random]))

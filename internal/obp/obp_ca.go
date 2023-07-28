@@ -44,11 +44,7 @@ func (obp *OBP) GetRegistrarCredentials() (*GetRegistrarCredentialsResponse, err
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
-		var err_rsp ErrorResponse
-		if err := json.Unmarshal([]byte(data), &err_rsp); err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("retrieve registrar failed %s", err_rsp.ErrorDescription)
+		return nil, fmt.Errorf("retrieve registrar failed %s", string(data))
 	}
 
 	var adminCreds GetRegistrarCredentialsResponse
@@ -87,7 +83,7 @@ func (obp *OBP) GetIdentities(registrarCert []byte, Sign func([]byte) ([]byte, e
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
-		return nil, err
+		return nil, fmt.Errorf("failed to get identities: %s", string(data))
 	}
 
 	return data, nil
@@ -121,7 +117,7 @@ func (obp *OBP) GetIdentity(username string, registrarCert []byte, Sign func([]b
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
-		return nil, err
+		return nil, fmt.Errorf("failed to get identity: %s", string(data))
 	}
 
 	return data, nil

@@ -78,6 +78,9 @@ func WithConfigFromEnv() *Config {
 		Address:       os.Getenv("VAULT_ADDR"),
 		RoleID:        os.Getenv("VAULT_ROLE_ID"),
 		SecretID:      os.Getenv("VAULT_SECRET_ID"),
+		TLSCaCert:     os.Getenv("VAULT_TLS_CA_CERT"),
+		TLSClientCert: os.Getenv("VAULT_TLS_CLIENT_CERT"),
+		TLSClientKey:  os.Getenv("VAULT_TLS_CLIENT_KEY"),
 		TransitConfig: WithTransitConfigFromEnv(),
 		SecretsConfig: WithSecretsConfigFromEnv(),
 	}

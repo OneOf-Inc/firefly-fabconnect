@@ -41,7 +41,7 @@ func New(cfg *Config) (*Vault, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse vault address: %w", err)
 	}
-	if parsedurl.Scheme != "https" {
+	if parsedurl.Scheme == "https" {
 		tlsCfg := api.TLSConfig{
 			CACert:     cfg.TLSCaCert,
 			ClientCert: cfg.TLSClientCert,

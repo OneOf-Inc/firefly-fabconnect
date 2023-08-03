@@ -16,9 +16,7 @@ const (
 	AUTHENTICATOR_SCHEMA_URN   = "urn:ietf:params:scim:schemas:oracle:idcs:HTTPAuthenticator"
 	BULK_OPERATION_SCHEMA_URN  = "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
 	PATCH_OPERATION_SCHEMA_URN = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-
-	CA_USER_GROUP_ID = "966988aa9f314f218287e39cd9ddc5a7"
-)
+	)
 
 type LoginOAuthResponse struct {
 	AccessToken string `json:"access_token"`
@@ -210,7 +208,7 @@ func (obp *OBP) CreateUser(userData *UserData, password string) (*CreateUserResp
 		},
 		Groups: []OBPGroup{
 			{
-				Value: CA_USER_GROUP_ID,
+				Value: obp.ca_user_group_id,
 			},
 		},
 		Active:   true,
@@ -369,7 +367,7 @@ func (obp *OBP) AddUserToUserCAGroup(userID string) (*AddUserToGroupResponse, er
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/admin/v1/Groups/%s", obp.getBaseUrl(), CA_USER_GROUP_ID)
+	url := fmt.Sprintf("%s/admin/v1/Groups/%s", obp.getBaseUrl(), obp.ca_user_group_id)
 	method := "PATCH"
 
 	addToGroupRequest := AddUserToGroupData{
@@ -398,7 +396,7 @@ func (obp *OBP) AddUserToUserCAGroup(userID string) (*AddUserToGroupResponse, er
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", login.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
 

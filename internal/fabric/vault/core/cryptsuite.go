@@ -94,7 +94,10 @@ func (c CryptoSuite) KeyImport(raw interface{}, opts fabcore.KeyImportOpts) (k f
 	
 		// Convert the PEM-encoded byte slice to a string
 		pemString := string(pemCert)
-		err = c.vault.Secret().WriteSecret(fmt.Sprintf("%s/%s", c.path, cert.Subject.CommonName), map[string]interface{}{
+
+		issuerOrganization := cert.Issuer.Organization[0]
+
+		err = c.vault.Secret().WriteSecret(fmt.Sprintf("%s/certs/%s", issuerOrganization, cert.Subject.CommonName), map[string]interface{}{
 			cert.Subject.CommonName: pemString,
 		})
 		if err != nil {

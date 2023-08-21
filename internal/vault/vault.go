@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/approle"
@@ -88,17 +89,27 @@ func WithConfigFromEnv() *Config {
 }
 
 func (v *Vault) login() error {
-	appRoleAuth, err := auth.NewAppRoleAuth(v.RoleID, &auth.SecretID{FromString: v.SecretID})
-	if err != nil {
-		return fmt.Errorf("unable to initialize AppRole auth method: %w", err)
+	s, err := v.client.Logical().Read("auth/token/lookup-self")
+	ttl := time.Duration(0)
+	if s != nil {
+		ttl, err = s.TokenTTL()
+		if err != nil {
+			return fmt.Errorf("unable to get token TTL: %w", err)
+		}
 	}
+	if err != nil || s == nil || ttl < 10*time.Second {
+		appRoleAuth, err := auth.NewAppRoleAuth(v.RoleID, &auth.SecretID{FromString: v.SecretID})
+		if err != nil {
+			return fmt.Errorf("unable to initialize AppRole auth method: %w", err)
+		}
 
-	authInfo, err := v.client.Auth().Login(context.Background(), appRoleAuth)
-	if err != nil {
-		return fmt.Errorf("unable to login to AppRole auth method: %w", err)
-	}
-	if authInfo == nil {
-		return fmt.Errorf("no auth info was returned after login")
+		authInfo, err := v.client.Auth().Login(context.Background(), appRoleAuth)
+		if err != nil {
+			return fmt.Errorf("unable to login to AppRole auth method: %w", err)
+		}
+		if authInfo == nil {
+			return fmt.Errorf("no auth info was returned after login")
+		}
 	}
 
 	return nil

@@ -92,7 +92,6 @@ func (v *Vault) login() error {
 	ttl, err := v.reuseToken()
 
 	if err != nil || ttl < 30*time.Second {
-		fmt.Printf("Logging in to Vault\n")
 		appRoleAuth, err := auth.NewAppRoleAuth(v.RoleID, &auth.SecretID{FromString: v.SecretID})
 		if err != nil {
 			return fmt.Errorf("unable to initialize AppRole auth method: %w", err)
@@ -120,11 +119,6 @@ func (v *Vault) reuseToken() (time.Duration, error) {
 	if err != nil {
 		return time.Duration(0), fmt.Errorf("unable to get token TTL: %w", err)
 	}
-
-	token := v.client.Token()
-	fmt.Printf("Token: %s\n", token)
-
-	fmt.Printf("Token TTL: %s\n", ttl)
 
 	return ttl, nil
 }

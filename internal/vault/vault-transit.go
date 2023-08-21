@@ -20,8 +20,9 @@ type TransitConfig struct {
 }
 
 type Transit struct {
-	c   *api.Client
-	cfg *TransitConfig
+	c    *api.Client
+	v    *Vault
+	cfg  *TransitConfig
 }
 
 type SignOpts struct {
@@ -42,11 +43,14 @@ func WithTransitConfigFromEnv() *TransitConfig {
 }
 
 func (v *Vault) Transit() *Transit {
-	v.login()
-	return &Transit{c: v.client, cfg: v.transitCfg}
+	return &Transit{c: v.client, v: v, cfg: v.transitCfg}
 }
 
 func (t *Transit) CreateKey(keyName string, keyType string) error {
+	if err := t.v.login(); err != nil {
+		return fmt.Errorf("failed to authenticate: %v", err)
+	}
+
 	_, err := t.c.Logical().Write(fmt.Sprintf("%s/keys/%s", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"type": keyType,
 	})
@@ -57,6 +61,10 @@ func (t *Transit) CreateKey(keyName string, keyType string) error {
 }
 
 func (t *Transit) ImportKey(keyName string, keyType string, key []byte) error {
+	if err := t.v.login(); err != nil {
+		return fmt.Errorf("failed to authenticate: %v", err)
+	}
+
 	wrappingKey, err := t.getWrappingKey()
 	if err != nil {
 		return fmt.Errorf("failed to get wrapping key")
@@ -67,6 +75,9 @@ func (t *Transit) ImportKey(keyName string, keyType string, key []byte) error {
 		return fmt.Errorf("failed to wrap key")
 	}
 
+	if err := t.v.login(); err != nil {
+		return fmt.Errorf("failed to authenticate: %v", err)
+	}
 	_, err = t.c.Logical().Write(fmt.Sprintf("%s/keys/%s/import", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"ciphertext":    ciphertext,
 		"type":          keyType,
@@ -81,6 +92,10 @@ func (t *Transit) ImportKey(keyName string, keyType string, key []byte) error {
 }
 
 func (t *Transit) GetKey(keyName string) (string, error) {
+	if err := t.v.login(); err != nil {
+		return "", fmt.Errorf("failed to authenticate: %v", err)
+	}
+
 	s, err := t.c.Logical().Read(fmt.Sprintf("%s/keys/%s", t.cfg.MountPoint, keyName))
 	if err != nil {
 		return "", err
@@ -104,6 +119,10 @@ func (t *Transit) GetKey(keyName string) (string, error) {
 }
 
 func (t *Transit) Sign(keyName string, input []byte, opts *SignOpts) ([]byte, error) {
+	if err := t.v.login(); err != nil {
+		return nil, fmt.Errorf("failed to authenticate: %v", err)
+	}
+
 	s, err := t.c.Logical().Write(fmt.Sprintf("%s/sign/%s", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"input":          base64.StdEncoding.EncodeToString(input),
 		"prehashed":      opts.Preshashed,
@@ -126,6 +145,10 @@ func (t *Transit) Sign(keyName string, input []byte, opts *SignOpts) ([]byte, er
 }
 
 func (t *Transit) Verify(keyName string, input []byte, signature []byte, opts *SignOpts) (bool, error) {
+	if err := t.v.login(); err != nil {
+		return false, fmt.Errorf("failed to authenticate: %v", err)
+	}
+
 	s, err := t.c.Logical().Write(fmt.Sprintf("%s/verify/%s", t.cfg.MountPoint, keyName), map[string]interface{}{
 		"input":          base64.StdEncoding.EncodeToString(input),
 		"signature":      fmt.Sprintf("vault:v1:%s", base64.StdEncoding.EncodeToString(signature)),
@@ -142,6 +165,10 @@ func (t *Transit) Verify(keyName string, input []byte, signature []byte, opts *S
 }
 
 func (t *Transit) getWrappingKey() (string, error) {
+	if err := t.v.login(); err != nil {
+		return "", fmt.Errorf("failed to authenticate: %v", err)
+	}
+
 	s, err := t.c.Logical().Read(fmt.Sprintf("%s/wrapping_key", t.cfg.MountPoint))
 	if err != nil {
 		return "", err

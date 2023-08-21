@@ -5,8 +5,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
-	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/vault/core"
+	"github.com/hyperledger/firefly-fabconnect/internal/vault"
 )
 
 type Identity struct {
@@ -14,7 +14,7 @@ type Identity struct {
 	IDBytes []byte    `protobuf:"bytes,2,opt,name=idBytes,proto3" json:"idBytes,omitempty"`
 	Key     *core.Key `json:"-"`
 
-	VaultTransit *vault.Transit
+	Vault *vault.Vault
 }
 
 // Reset resets struct
@@ -40,7 +40,7 @@ func (m *Identity) Identifier() *msp.IdentityIdentifier {
 
 // Verify a signature over some message using this identity as reference
 func (m *Identity) Verify(msg []byte, sig []byte) error {
-	v, err := m.VaultTransit.Verify(m.Key.ID, msg, sig, &vault.SignOpts{Hash: "sha2-256", Preshashed: false})
+	v, err := m.Vault.Transit().Verify(m.Key.ID, msg, sig, &vault.SignOpts{Hash: "sha2-256", Preshashed: false})
 	if err != nil {
 		return fmt.Errorf("failed to verify signature: %v", err)
 	}

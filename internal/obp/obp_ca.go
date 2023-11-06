@@ -64,7 +64,7 @@ func (obp *OBP) GetIdentities(registrarCert []byte, Sign func([]byte) ([]byte, e
 	}
 
 	client := &http.Client{}
-	url := fmt.Sprintf("https://%s-oneof-iad.blockchain.ocp.oraclecloud.com:7443/%s", obp.org_id, uri)
+	url := fmt.Sprintf("%s/%s", obp.caUrl, uri)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (obp *OBP) GetIdentity(username string, registrarCert []byte, Sign func([]b
 	}
 
 	client := &http.Client{}
-	url := fmt.Sprintf("https://%s-oneof-iad.blockchain.ocp.oraclecloud.com:7443/%s", obp.org_id, uri)
+	url := fmt.Sprintf("%s/%s", obp.caUrl, uri)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
